@@ -151,16 +151,35 @@ export class LettaService {
         label: `${workspaceName}ProjectMemory`
       });
 
+      // Create standard memory blocks for the agent
+      const humanBlock = await client.blocks.create({
+        value: `Information about the human user.`,
+        label: `human`
+      });
+      
+      const systemBlock = await client.blocks.create({
+        value: `System information for the agent.`,
+        label: `system`
+      });
+
       // Read config
       const config = vscode.workspace.getConfiguration('lettaChat');
       const model = config.get<string>('model') || 'openai/gpt-4o';
       const embeddingModel = config.get<string>('embeddingModel') || 'letta/letta-free';
 
+      // Include all necessary blocks
+      const blockIds = [
+        personaBlockId, 
+        projectBlock.id || '',
+        humanBlock.id || '',
+        systemBlock.id || ''
+      ].filter(id => id !== '');
+
       // Create the agent, passing `embedding` (string) to satisfy the API
       const agent = await client.agents.create({
         name: `VSCode-${workspaceName}-Agent`,
         description: `VS Code agent for the ${workspaceName} workspace`,
-        blockIds: [personaBlockId, projectBlock.id || ''],
+        blockIds: blockIds,
         model,
         embedding: embeddingModel
       } as any);
