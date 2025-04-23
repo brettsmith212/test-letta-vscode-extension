@@ -90,19 +90,34 @@ export class ChatAdapter {
       this.currentStreamController = new AbortController();
 
       // Convert messages to Letta format
-      const lettaMessages: MessageCreate[] = messages.map(msg => ({
-        role: msg.role as MessageCreateRole,
-        content: typeof msg.content === 'string' 
-          ? msg.content 
-          : msg.content
-              .map(block => {
-                if (block.type === 'text') return (block as TextBlock).text;
-                if (block.type === 'tool_result') return (block as ToolResultBlock).content;
-                return '';
-              })
-              .filter(Boolean)
-              .join('\n')
-      }));
+      const lettaMessages: MessageCreate[] = messages.map(msg => {
+        // Map our roles to what Letta API expects
+        let role: MessageCreateRole;
+        if (msg.role === 'user') {
+          role = 'user' as MessageCreateRole;
+        } else if (msg.role === 'assistant') {
+          // The Letta API doesn't accept 'assistant' role directly
+          // Mapping to the API-compatible 'system' role for assistant messages
+          role = 'system' as MessageCreateRole;
+        } else {
+          // Default fallback
+          role = 'user' as MessageCreateRole;
+        }
+        
+        return {
+          role,
+          content: typeof msg.content === 'string' 
+            ? msg.content 
+            : msg.content
+                .map(block => {
+                  if (block.type === 'text') return (block as TextBlock).text;
+                  if (block.type === 'tool_result') return (block as ToolResultBlock).content;
+                  return '';
+                })
+                .filter(Boolean)
+                .join('\n')
+        };
+      });
 
       // Generate a new messageId for the response
       const messageId = this._messages.length;

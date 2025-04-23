@@ -14,6 +14,7 @@ export class LettaService {
   private personaBlockId: string | null = null;
   private context: vscode.ExtensionContext | null = null;
   private workspaceAgentMap: Map<string, {agentId: string, projectBlockId: string}> = new Map();
+  private toolsCache: Map<string, string> = new Map(); // Map<toolName, toolId>
 
   private constructor() {}
 
@@ -52,6 +53,12 @@ export class LettaService {
       const savedMappings = context.globalState.get<Record<string, {agentId: string, projectBlockId: string}>>('lettaWorkspaceAgents') || {};
       Object.entries(savedMappings).forEach(([key, value]) => {
         this.workspaceAgentMap.set(key, value);
+      });
+
+      // Restore tool cache
+      const savedTools = context.globalState.get<Record<string, string>>('lettaToolsCache') || {};
+      Object.entries(savedTools).forEach(([key, value]) => {
+        this.toolsCache.set(key, value);
       });
       
       this.initialized = true;
@@ -111,8 +118,26 @@ export class LettaService {
 
     const workspaceKey = this.getWorkspaceKey(workspaceUri);
     const existing = this.workspaceAgentMap.get(workspaceKey);
+    
     if (existing) {
-      return existing;
+      try {
+        // Verify that the agent still exists on the server
+        const client = this.getClient();
+        await client.agents.retrieve(existing.agentId);
+        return existing;
+      } catch (error: any) {
+        // If we get a 404, the agent no longer exists on the server
+        if (error?.statusCode === 404) {
+          console.log(`Agent ${existing.agentId} no longer exists on the server. Creating a new one.`);
+          // Remove the stale mapping
+          this.workspaceAgentMap.delete(workspaceKey);
+          await this.saveWorkspaceAgentMap();
+          // Continue to create a new agent
+        } else {
+          // For other errors, propagate them up
+          throw error;
+        }
+      }
     }
 
     try {
@@ -142,28 +167,7 @@ export class LettaService {
 
       // Attach file and terminal tools
       if (agent.id) {
-        for (const tool of fileTools) {
-          const created = await client.tools.create({
-            description: tool.description,
-            sourceCode: JSON.stringify({ name: tool.name, description: tool.description, parameters: tool.input_schema }),
-            sourceType: 'function',
-            jsonSchema: { name: tool.name, description: tool.description, parameters: tool.input_schema }
-          });
-          if (created.id) {
-            await client.agents.tools.attach(agent.id, created.id);
-          }
-        }
-        for (const tool of terminalTools) {
-          const created = await client.tools.create({
-            description: tool.description,
-            sourceCode: JSON.stringify({ name: tool.name, description: tool.description, parameters: tool.input_schema }),
-            sourceType: 'function',
-            jsonSchema: { name: tool.name, description: tool.description, parameters: tool.input_schema }
-          });
-          if (created.id) {
-            await client.agents.tools.attach(agent.id, created.id);
-          }
-        }
+        await this.attachToolsToAgent(agent.id);
       }
 
       const agentData = { agentId: agent.id || '', projectBlockId: projectBlock.id || '' };
@@ -173,6 +177,133 @@ export class LettaService {
     } catch (error) {
       console.error('Failed to create agent for workspace:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Attach tools to an agent, reusing existing tools if possible
+   */
+  private async attachToolsToAgent(agentId: string): Promise<void> {
+    const client = this.getClient();
+    
+    // Get tools already attached to the agent
+    let attachedTools: any[] = [];
+    try {
+      attachedTools = await client.agents.tools.list(agentId);
+    } catch (error) {
+      console.warn(`Failed to list tools for agent ${agentId}:`, error);
+      // Continue with empty list if we can't get existing tools
+    }
+    
+    // Create map of tool names to IDs for easy lookup
+    const attachedToolMap = new Map<string, string>();
+    for (const tool of attachedTools) {
+      if (tool.jsonSchema && typeof tool.jsonSchema === 'object' && 'name' in tool.jsonSchema) {
+        const name = tool.jsonSchema.name;
+        if (name && tool.id) {
+          attachedToolMap.set(name, tool.id);
+          
+          // Update our cache while we're at it
+          this.toolsCache.set(name, tool.id);
+        }
+      }
+    }
+    
+    // Process all the tools we need
+    const allTools = [...fileTools, ...terminalTools];
+    for (const tool of allTools) {
+      // Skip if tool is already attached
+      if (attachedToolMap.has(tool.name)) {
+        console.log(`Tool ${tool.name} already attached to agent ${agentId}`);
+        continue;
+      }
+      
+      // Otherwise attach the tool
+      await this.attachToolToAgent(agentId, tool.name, tool.description, tool.input_schema);
+    }
+    
+    // Save the tool cache
+    await this.saveToolsCache();
+  }
+  
+  /**
+   * Attach a single tool to an agent, reusing existing tool if possible
+   */
+  private async attachToolToAgent(agentId: string, name: string, description: string, inputSchema: any): Promise<void> {
+    const client = this.getClient();
+    let toolId = this.toolsCache.get(name);
+    
+    // Check if we have a cached tool ID
+    if (toolId) {
+      try {
+        // Verify that the tool still exists
+        await client.tools.retrieve(toolId);
+        
+        // Tool exists, attach it to the agent
+        await client.agents.tools.attach(agentId, toolId);
+        return;
+      } catch (error: any) {
+        // If we get a 404, the tool no longer exists
+        if (error?.statusCode === 404) {
+          console.log(`Tool ${name} (${toolId}) no longer exists on the server. Creating a new one.`);
+          // Clear the stale tool ID
+          this.toolsCache.delete(name);
+          toolId = undefined;
+        } else {
+          // For other errors, propagate them up
+          throw error;
+        }
+      }
+    }
+    
+    try {
+      // Try to create a new tool
+      const created = await client.tools.create({
+        description: description,
+        sourceCode: JSON.stringify({ name, description, parameters: inputSchema }),
+        sourceType: 'function',
+        jsonSchema: { name, description, parameters: inputSchema }
+      });
+      
+      if (created.id) {
+        // Cache the tool ID
+        this.toolsCache.set(name, created.id);
+        
+        // Attach to the agent
+        await client.agents.tools.attach(agentId, created.id);
+      }
+    } catch (error: any) {
+      // Handle the case where the tool already exists (409 Conflict)
+      if (error?.statusCode === 409) {
+        console.log(`Tool ${name} already exists on the server. Trying to find it.`);
+        
+        // Try to find the tool by listing all tools and filtering
+        const allTools = await client.tools.list();
+        const existingTool = allTools.find(tool => 
+          tool.jsonSchema && 
+          typeof tool.jsonSchema === 'object' && 
+          'name' in tool.jsonSchema && 
+          tool.jsonSchema.name === name
+        );
+        
+        if (existingTool && existingTool.id) {
+          // Found the existing tool
+          console.log(`Found existing tool ${name} with ID ${existingTool.id}`);
+          
+          // Cache the tool ID
+          this.toolsCache.set(name, existingTool.id);
+          
+          // Attach to the agent
+          await client.agents.tools.attach(agentId, existingTool.id);
+        } else {
+          // Couldn't find the tool
+          console.error(`Tool ${name} exists but couldn't be found`);
+          throw error;
+        }
+      } else {
+        // For other errors, propagate them up
+        throw error;
+      }
     }
   }
 
@@ -187,5 +318,13 @@ export class LettaService {
     const obj: Record<string, {agentId: string, projectBlockId: string}> = {};
     this.workspaceAgentMap.forEach((v, k) => obj[k] = v);
     await this.context.globalState.update('lettaWorkspaceAgents', obj);
+  }
+  
+  /** Persist the tools cache */
+  private async saveToolsCache(): Promise<void> {
+    if (!this.context) return;
+    const obj: Record<string, string> = {};
+    this.toolsCache.forEach((v, k) => obj[k] = v);
+    await this.context.globalState.update('lettaToolsCache', obj);
   }
 }
