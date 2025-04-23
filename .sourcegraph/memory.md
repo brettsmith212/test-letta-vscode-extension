@@ -14,6 +14,9 @@ This project is a VS Code extension that integrates with the Letta agent framewo
 ## Progress Tracking
 When you complete a step be sure to mark it completed in implementation.md as well.
 
+## Helpful Notes
+- Always import letta sdk as `@letta-ai/letta-client`
+
 ### Completed
 - [x] Step 1.1: Added Letta SDK and Docker CLI helper
   - Added `@letta/sdk` and `dockerode` dependencies
@@ -23,7 +26,11 @@ When you complete a step be sure to mark it completed in implementation.md as we
 - [x] Step 1.2: Added VS Code settings schema
   - Extended package.json with `lettaChat.*` settings
 
+- [x] Step 2.1: Created LettaService singleton
+  - Created service with initialize(), ensureServer(), getClient(), and getOrCreatePersonaBlock() methods
+  - Implemented Docker health checks and server startup
+  - Added persona block creation and global state persistence
+
 ### Next Steps
-- [ ] Step 2.1: Create LettaService singleton
 - [ ] Step 2.2: Implement workspace agent mapping
 - [ ] Step 2.3: Register VS Code tools with Letta agent

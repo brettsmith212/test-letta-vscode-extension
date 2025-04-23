@@ -26,7 +26,7 @@
   - **Step Dependencies**: 1.1
 
 ## 2 – Core Letta Service
-- [ ] Step 2.1: Create `LettaService` singleton  
+- [x] Step 2.1: Create `LettaService` singleton  
   - **Task**: Implement `LettaService` that initializes the Letta SDK client, ensures the server is running via `dockerHelper`, and handles persona block creation.  
   - **Description**: Centralizes server lifecycle, SDK instantiation, and persona-memory setup; stores persona `blockId` in `globalState`.  
   - **Files**:  
