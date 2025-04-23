@@ -204,13 +204,30 @@ export class LettaService {
    */
   private async attachToolsToAgent(agentId: string): Promise<void> {
     const client = this.getClient();
+    console.log(`[DEBUG] Starting attachToolsToAgent for agent ${agentId}`);
+    
+    // All of our custom tools should be recreated with proper schemas
+    const problematicTools = [
+      // File tools
+      'create_file',
+      'update_file',
+      'delete_file',
+      'read_file',
+      'search_files',
+      'list_files',
+      // Terminal tools
+      'run_command',
+      'read_terminal_output'
+    ];
     
     // Get tools already attached to the agent
     let attachedTools: any[] = [];
     try {
+      console.log(`[DEBUG] Attempting to list tools for agent ${agentId}`);
       attachedTools = await client.agents.tools.list(agentId);
+      console.log(`[DEBUG] Found ${attachedTools.length} tools already attached to agent ${agentId}`);
     } catch (error) {
-      console.warn(`Failed to list tools for agent ${agentId}:`, error);
+      console.warn(`[DEBUG] Failed to list tools for agent ${agentId}:`, error);
       // Continue with empty list if we can't get existing tools
     }
     
@@ -221,6 +238,7 @@ export class LettaService {
         const name = tool.jsonSchema.name;
         if (name && tool.id) {
           attachedToolMap.set(name, tool.id);
+          console.log(`[DEBUG] Found attached tool ${name} with ID ${tool.id}`);
           
           // Update our cache while we're at it
           this.toolsCache.set(name, tool.id);
@@ -228,95 +246,246 @@ export class LettaService {
       }
     }
     
+    // Delete problematic tools if they exist
+    for (const toolName of problematicTools) {
+      const toolId = this.toolsCache.get(toolName);
+      if (toolId) {
+        await this.deleteAndRemoveFromCache(toolName, toolId);
+        attachedToolMap.delete(toolName);
+      }
+    }
+    
     // Process all the tools we need
     const allTools = [...fileTools, ...terminalTools];
+    console.log(`[DEBUG] Processing ${allTools.length} tools to attach`);
+    
     for (const tool of allTools) {
+      console.log(`[DEBUG] Processing tool ${tool.name}`);
+      
+      // Force recreate problematic tools
+      if (problematicTools.includes(tool.name)) {
+        console.log(`[DEBUG] ${tool.name} is known to be problematic, recreating it`);
+        await this.forceCreateAndAttachTool(agentId, tool.name, tool.description, tool.input_schema);
+        continue;
+      }
+      
       // Skip if tool is already attached
       if (attachedToolMap.has(tool.name)) {
-        console.log(`Tool ${tool.name} already attached to agent ${agentId}`);
+        console.log(`[DEBUG] Tool ${tool.name} already attached to agent ${agentId}, skipping`);
         continue;
       }
       
       // Otherwise attach the tool
+      console.log(`[DEBUG] Attaching tool ${tool.name} to agent ${agentId}`);
       await this.attachToolToAgent(agentId, tool.name, tool.description, tool.input_schema);
     }
     
     // Save the tool cache
     await this.saveToolsCache();
+    console.log(`[DEBUG] Completed attachToolsToAgent for agent ${agentId}`);
   }
   
+  /**
+   * Delete a tool and remove it from the cache
+   */
+  private async deleteAndRemoveFromCache(toolName: string, toolId: string): Promise<void> {
+    console.log(`[DEBUG] Deleting problematic tool ${toolName} (${toolId})`);
+    const client = this.getClient();
+    
+    try {
+      await client.tools.delete(toolId);
+      console.log(`[DEBUG] Successfully deleted tool ${toolName} (${toolId})`);
+      this.toolsCache.delete(toolName);
+    } catch (error) {
+      console.error(`[DEBUG] Error deleting tool ${toolName}:`, error);
+      // Continue even if deletion fails
+    }
+  }
+  
+  /**
+   * Force create a new tool and attach it to an agent
+   */
+  private async forceCreateAndAttachTool(agentId: string, name: string, description: string, inputSchema: any): Promise<void> {
+    console.log(`[DEBUG] Force creating tool ${name}`);
+    const client = this.getClient();
+    
+    try {
+      // Create a proper JSON schema for the tool
+      const jsonSchema = {
+        name: name,
+        description: description,
+        parameters: inputSchema
+      };
+      
+      // Create a simple Python function for the tool
+      let functionParams = '';
+      if (inputSchema.properties) {
+        // Generate params with descriptions in docstring
+        const params = Object.keys(inputSchema.properties);
+        functionParams = params.join(', ');
+        
+        // Build docstring with parameter descriptions
+        let docString = `${description}\n\n`;
+        for (const param of params) {
+          const paramDesc = inputSchema.properties[param].description || 'Parameter description';
+          docString += `    :param ${param}: ${paramDesc}\n`;
+        }
+        docString += `    :return: The result of the operation`;
+        
+        const sourceCode = `
+def ${name}(${functionParams}):
+    """
+${docString}
+    """
+    return "This is executed by the VS Code extension"
+`.trim();
+
+        console.log(`[DEBUG] Creating tool with improved docstring format:`, sourceCode);
+
+        // Create the tool
+        const created = await client.tools.create({
+          description: description,
+          sourceCode: sourceCode,
+          sourceType: 'python',
+          jsonSchema: jsonSchema // Include explicit JSON schema
+        });
+        
+        if (created.id) {
+          // Cache the tool ID
+          console.log(`[DEBUG] Caching force-created tool ID ${created.id} for ${name}`);
+          this.toolsCache.set(name, created.id);
+          
+          // Attach to the agent
+          console.log(`[DEBUG] Attaching force-created tool ${name} (${created.id}) to agent ${agentId}`);
+          await client.agents.tools.attach(agentId, created.id);
+          console.log(`[DEBUG] Successfully created and attached problematic tool ${name}`);
+        } else {
+          console.error(`[DEBUG] Force-created tool has no ID:`, created);
+        }
+      } else {
+        console.error(`[DEBUG] Invalid schema for tool ${name}, no properties defined`);
+      }
+    } catch (error) {
+      console.error(`[DEBUG] Error force creating tool ${name}:`, error);
+      throw error;
+    }
+  }
+
   /**
    * Attach a single tool to an agent, reusing existing tool if possible
    */
   private async attachToolToAgent(agentId: string, name: string, description: string, inputSchema: any): Promise<void> {
+    console.log(`[DEBUG] Starting attachToolToAgent for tool ${name}`);
     const client = this.getClient();
     let toolId = this.toolsCache.get(name);
     
     // Check if we have a cached tool ID
     if (toolId) {
+      console.log(`[DEBUG] Found cached tool ID ${toolId} for tool ${name}`);
       try {
         // Verify that the tool still exists
+        console.log(`[DEBUG] Verifying tool ${name} (${toolId}) exists`);
         await client.tools.retrieve(toolId);
         
         // Tool exists, attach it to the agent
+        console.log(`[DEBUG] Tool ${name} exists, attaching to agent ${agentId}`);
         await client.agents.tools.attach(agentId, toolId);
+        console.log(`[DEBUG] Successfully attached existing tool ${name} to agent ${agentId}`);
         return;
       } catch (error: any) {
         // If we get a 404, the tool no longer exists
         if (error?.statusCode === 404) {
-          console.log(`Tool ${name} (${toolId}) no longer exists on the server. Creating a new one.`);
+          console.log(`[DEBUG] Tool ${name} (${toolId}) no longer exists on the server. Creating a new one.`);
           // Clear the stale tool ID
           this.toolsCache.delete(name);
           toolId = undefined;
         } else {
+          console.error(`[DEBUG] Error verifying tool ${name}:`, error);
           // For other errors, propagate them up
           throw error;
         }
       }
+    } else {
+      console.log(`[DEBUG] No cached tool ID found for ${name}`);
     }
     
     try {
-      // Try to create a new tool
-      const created = await client.tools.create({
+      console.log(`[DEBUG] Creating new tool ${name}`);
+      // Create a proper JSON schema for the tool
+      const jsonSchema = {
+        name: name,
         description: description,
-        sourceCode: JSON.stringify({ name, description, parameters: inputSchema }),
-        sourceType: 'function',
-        jsonSchema: { name, description, parameters: inputSchema }
+        parameters: inputSchema
+      };
+      
+      // Create a simpler Python-style function definition
+      let functionParams = '';
+      if (inputSchema.properties) {
+        functionParams = Object.keys(inputSchema.properties).join(', ');
+      }
+      
+      const sourceCode = `
+def ${name}(${functionParams}):
+    """${description}"""
+    return "This is executed by the VS Code extension"
+`.trim();
+      console.log(`[DEBUG] Creating tool w/ sourceCode:`, sourceCode);
+
+      // Create or update the tool
+      console.log(`[DEBUG] Calling tools.upsert for ${name}`);
+      const created = await client.tools.upsert({
+        description: description,
+        sourceCode: sourceCode,
+        jsonSchema: jsonSchema
       });
+      
+      console.log(`[DEBUG] Upsert result:`, created);
       
       if (created.id) {
         // Cache the tool ID
+        console.log(`[DEBUG] Caching tool ID ${created.id} for ${name}`);
         this.toolsCache.set(name, created.id);
         
         // Attach to the agent
+        console.log(`[DEBUG] Attaching new tool ${name} (${created.id}) to agent ${agentId}`);
         await client.agents.tools.attach(agentId, created.id);
+        console.log(`[DEBUG] Successfully created and attached tool ${name}`);
+      } else {
+        console.error(`[DEBUG] Created tool has no ID:`, created);
       }
     } catch (error: any) {
+      console.error(`[DEBUG] Error creating tool ${name}:`, error);
       // Handle the case where the tool already exists (409 Conflict)
       if (error?.statusCode === 409) {
-        console.log(`Tool ${name} already exists on the server. Trying to find it.`);
+        console.log(`[DEBUG] Tool ${name} already exists on the server. Trying to find it.`);
         
         // Try to find the tool by listing all tools and filtering
+        console.log(`[DEBUG] Listing all tools to find ${name}`);
         const allTools = await client.tools.list();
+        console.log(`[DEBUG] Found ${allTools.length} tools total`);
+        
         const existingTool = allTools.find(tool => 
-          tool.jsonSchema && 
-          typeof tool.jsonSchema === 'object' && 
-          'name' in tool.jsonSchema && 
-          tool.jsonSchema.name === name
+          tool.name === name || 
+          (tool.jsonSchema && 
+           typeof tool.jsonSchema === 'object' && 
+           'name' in tool.jsonSchema && 
+           tool.jsonSchema.name === name)
         );
         
         if (existingTool && existingTool.id) {
           // Found the existing tool
-          console.log(`Found existing tool ${name} with ID ${existingTool.id}`);
+          console.log(`[DEBUG] Found existing tool ${name} with ID ${existingTool.id}`);
           
           // Cache the tool ID
           this.toolsCache.set(name, existingTool.id);
           
           // Attach to the agent
+          console.log(`[DEBUG] Attaching found tool ${name} (${existingTool.id}) to agent ${agentId}`);
           await client.agents.tools.attach(agentId, existingTool.id);
+          console.log(`[DEBUG] Successfully attached found tool ${name}`);
         } else {
           // Couldn't find the tool
-          console.error(`Tool ${name} exists but couldn't be found`);
+          console.error(`[DEBUG] Tool ${name} exists but couldn't be found`);
           throw error;
         }
       } else {
