@@ -39,12 +39,14 @@ export class LettaService {
     this.context = context;
     
     try {
-      await this.ensureServer();
+      // We'll skip the server check since we know it's running manually
+      // await this.ensureServer();
       
       // Create Letta client
       const config = vscode.workspace.getConfiguration('lettaChat');
-      const serverUrl = config.get<string>('serverUrl') || 'http://localhost:8000';
+      const serverUrl = config.get<string>('serverUrl') || 'http://localhost:8283';
       
+      console.log(`Initializing Letta client with server URL: ${serverUrl}`);
       this.client = new LettaClient({
         baseUrl: serverUrl,
       });
@@ -71,6 +73,11 @@ export class LettaService {
    * Ensure the Letta server is running
    */
   public async ensureServer(): Promise<void> {
+    // Skipping Docker check since we know it's running
+    // Instead, just show a message that we're connecting to the existing server
+    vscode.window.showInformationMessage('Connecting to existing Letta server on port 8283...');
+    
+    /* Original implementation commented out
     // Check if Docker is available
     const dockerAvailable = await isDockerInstalled();
     if (!dockerAvailable) {
@@ -98,6 +105,7 @@ export class LettaService {
         throw new Error('Failed to start Letta server after multiple attempts');
       }
     }
+    */
   }
 
   /**
