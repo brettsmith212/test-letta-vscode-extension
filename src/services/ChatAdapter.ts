@@ -133,79 +133,135 @@ export class ChatAdapter {
       
       // Process the Letta stream
       for await (const chunk of stream) {
-        // Handle different chunk types based on type property
-        if ('type' in chunk) {
-          // Handle assistant message start
-          if (chunk.type === 'assistant_message_start') {
-            // Stream start, initialize
-            currentTextBlock = { type: 'text', text: '' };
-          }
-          // Handle assistant message delta
-          else if (chunk.type === 'assistant_message_delta' && 'delta' in chunk && chunk.delta) {
-            if (currentTextBlock && chunk.delta && typeof chunk.delta === 'object' && 'content' in chunk.delta) {
-              // Append text to the current block
-              currentTextBlock.text += chunk.delta.content || '';
+        // Handle different chunk types based on the response structure
+        if (chunk && typeof chunk === 'object') {
+          // Check for type property (for assistant_message_start, assistant_message_delta, etc)
+          if ('type' in chunk) {
+            const chunkType = chunk.type as string;
+            
+            // Handle assistant message start
+            if (chunkType === 'assistant_message_start') {
+              // Stream start, initialize
+              currentTextBlock = { type: 'text', text: '' };
+            }
+            // Handle assistant message delta
+            else if (chunkType === 'assistant_message_delta' && 'delta' in chunk && chunk.delta) {
+              if (currentTextBlock && chunk.delta && typeof chunk.delta === 'object' && 'content' in chunk.delta) {
+                // Append text to the current block
+                currentTextBlock.text += chunk.delta.content || '';
+                
+                // Stream text to UI
+                panel.webview.postMessage({
+                  command: 'appendAssistantResponse',
+                  text: chunk.delta.content || '',
+                  messageId
+                });
+              }
+            }
+            // Handle tool calls
+            else if (chunkType === 'tool_call' && 'id' in chunk && 'name' in chunk) {
+              // Handle tool call
+              const id = chunk.id as string;
+              const name = chunk.name as string;
+              const args = ('args' in chunk && typeof chunk.args === 'object' && chunk.args !== null) 
+                ? chunk.args as Record<string, any>
+                : {} as Record<string, any>;
               
-              // Stream text to UI
+              toolBlock = {
+                type: 'tool_use',
+                id,
+                name,
+                input: args
+              };
+              
+              if (toolBlock) {
+                // Process tool usage immediately
+                await this.handleToolUse(toolBlock, panel, messageId);
+                
+                // Add to assistant content
+                assistantContent.push(toolBlock);
+              }
+              
+              // Reset tool state
+              toolBlock = null;
+              currentToolName = null;
+              currentToolInput = null;
+            }
+            // Handle assistant message stop
+            else if (chunkType === 'assistant_message_stop') {
+              // Message complete, finalize
+              if (currentTextBlock && currentTextBlock.text) {
+                assistantContent.push(currentTextBlock);
+                currentTextBlock = null;
+              }
+              
+              // Add assistant message to history
+              if (assistantContent.length > 0) {
+                this._messages.push({ role: 'assistant', content: assistantContent });
+              }
+              
+              // Send the complete message to the UI
+              let finalText = '';
+              for (const block of assistantContent) {
+                if (block.type === 'text') {
+                  finalText += (block as TextBlock).text;
+                }
+              }
+              
+              // Add a final message to clear any UI spinner and show complete response
               panel.webview.postMessage({
-                command: 'appendAssistantResponse',
-                text: chunk.delta.content || '',
+                command: 'addAssistantMessage',
+                text: finalText,
                 messageId
               });
-            }
-          }
-          // Handle tool calls
-          else if (chunk.type === 'tool_call' && 'id' in chunk && 'name' in chunk) {
-            // Handle tool call
-            const id = chunk.id as string;
-            const name = chunk.name as string;
-            const args = ('args' in chunk && typeof chunk.args === 'object' && chunk.args !== null) 
-              ? chunk.args as Record<string, any>
-              : {} as Record<string, any>;
-            
-            toolBlock = {
-              type: 'tool_use',
-              id,
-              name,
-              input: args
-            };
-            
-            if (toolBlock) {
-              // Process tool usage immediately
-              await this.handleToolUse(toolBlock, panel, messageId);
               
-              // Add to assistant content
-              assistantContent.push(toolBlock);
+              break;
+            }
+          } 
+          // Check for other formats (in case the API returns differently)
+          else if ('content' in chunk && typeof chunk.content === 'string') {
+            // Direct content chunk
+            if (!currentTextBlock) {
+              currentTextBlock = { type: 'text', text: '' };
             }
             
-            // Reset tool state
-            toolBlock = null;
-            currentToolName = null;
-            currentToolInput = null;
-          }
-          // Handle assistant message stop
-          else if (chunk.type === 'assistant_message_stop') {
-            // Message complete, finalize
-            if (currentTextBlock && currentTextBlock.text) {
-              assistantContent.push(currentTextBlock);
-              currentTextBlock = null;
-            }
+            // Append text to the current block
+            currentTextBlock.text += chunk.content;
             
-            // Add assistant message to history
-            if (assistantContent.length > 0) {
-              this._messages.push({ role: 'assistant', content: assistantContent });
-            }
-            
-            // Add a final message to clear any UI spinner
+            // Stream text to UI
             panel.webview.postMessage({
-              command: 'addAssistantMessage',
-              text: '',
+              command: 'appendAssistantResponse',
+              text: chunk.content,
               messageId
             });
-            
-            break;
           }
         }
+      }
+
+      // If we didn't get an explicit stop message but the stream ended, 
+      // we should still finalize the response
+      if (currentTextBlock && currentTextBlock.text) {
+        assistantContent.push(currentTextBlock);
+                
+        // Add assistant message to history
+        if (assistantContent.length > 0) {
+          this._messages.push({ role: 'assistant', content: assistantContent });
+        }
+        
+        // Send the complete message to the UI
+        let finalText = '';
+        for (const block of assistantContent) {
+          if (block.type === 'text') {
+            finalText += (block as TextBlock).text;
+          }
+        }
+        
+        // Add a final message to clear any UI spinner and show complete response
+        panel.webview.postMessage({
+          command: 'addAssistantMessage',
+          text: finalText,
+          messageId
+        });
       }
 
       return assistantContent;
