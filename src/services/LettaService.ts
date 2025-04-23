@@ -178,10 +178,7 @@ export class LettaService {
       const agent = await client.agents.create({
         name: `VSCode-${workspaceName}-Agent`,
         description: `VS Code agent for the ${workspaceName} workspace`,
-        memory: {
-          personaBlockId: personaBlockId,
-          projectBlockId: projectBlock.id || '',
-        },
+        blockIds: [personaBlockId, projectBlock.id || ''],
         model: vscode.workspace.getConfiguration('lettaChat').get<string>('model') || 'openai/gpt-4o'
       });
 
