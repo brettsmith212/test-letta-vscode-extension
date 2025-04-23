@@ -129,7 +129,7 @@ export class LettaService {
       // Read config
       const config = vscode.workspace.getConfiguration('lettaChat');
       const model = config.get<string>('model') || 'openai/gpt-4o';
-      const embeddingModel = config.get<string>('embeddingModel') || 'openai/text-embedding-3-large';
+      const embeddingModel = config.get<string>('embeddingModel') || 'letta/letta-free';
 
       // Create the agent, passing `embedding` (string) to satisfy the API
       const agent = await client.agents.create({

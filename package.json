@@ -35,7 +35,7 @@
         },
         "lettaChat.embeddingModel": {
           "type": "string",
-          "default": "openai/text-embedding-3-large",
+          "default": "letta/letta-free",
           "description": "Model to use for text embeddings"
         },
         "lettaChat.agentScope": {
