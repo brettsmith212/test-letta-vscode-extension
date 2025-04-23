@@ -14,17 +14,38 @@
   "contributes": {
     "commands": [
       {
-        "command": "claude-chat.openChat",
-        "title": "Open Claude Chat"
+        "command": "letta-chat.openChat",
+        "title": "Open Letta Chat"
       }
     ],
     "configuration": {
-      "title": "Claude Chat",
+      "title": "Letta Chat",
       "properties": {
-        "claudeChat.apiKey": {
+        "lettaChat.serverUrl": {
           "type": "string",
-          "default": "",
-          "description": "API key for Claude-3.5"
+          "default": "http://localhost:8000",
+          "description": "URL of the Letta server"
+        },
+        "lettaChat.model": {
+          "type": "string",
+          "default": "openai/gpt-4o",
+          "description": "Model to use for chat completion"
+        },
+        "lettaChat.embeddingModel": {
+          "type": "string",
+          "default": "openai/text-embedding-3-large",
+          "description": "Model to use for text embeddings"
+        },
+        "lettaChat.agentScope": {
+          "type": "string",
+          "enum": ["workspace", "global", "folder"],
+          "default": "workspace",
+          "description": "Scope for the Letta agent memory (workspace, global, or folder-specific)"
+        },
+        "lettaChat.enableFileIndexing": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically index workspace files for agent memory"
         }
       }
     }
@@ -39,7 +60,8 @@
     "build:webviews": "vite build",
     "watch:webviews": "vite",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "start:letta": "node -e \"require('./out/utils/dockerHelper').runLettaContainer()\""
   },
   "devDependencies": {
     "@storybook/addon-essentials": "^8.6.12",
@@ -48,6 +70,7 @@
     "@storybook/react": "^8.6.12",
     "@storybook/react-vite": "^8.6.12",
     "@storybook/testing-library": "^0.2.1",
+    "@types/dockerode": "^3.3.26",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/react": "^18.0.0",
@@ -67,12 +90,14 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@letta-ai/letta-client": "^0.1.102",
     "@radix-ui/react-scroll-area": "^1.2.4",
     "@radix-ui/react-slot": "^1.2.0",
     "@radix-ui/react-toast": "^1.2.7",
     "axios": "^1.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dockerode": "^3.3.5",
     "highlight.js": "^11.10.0",
     "lucide-react": "^0.487.0",
     "react": "^18.0.0",
