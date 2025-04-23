@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import Anthropic from '@anthropic-ai/sdk';
 
-export const fileTools: Anthropic.Tool[] = [
+// Define tool schema in Letta-compatible format
+export const fileTools = [
   {
     name: "create_file",
     description: "Creates a new file with the specified content at the given path, or overwrites it if it already exists. Use this when you need to create a new file or replace an existing one in the project. The path should be relative to the workspace root.",

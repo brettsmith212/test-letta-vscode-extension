@@ -89,7 +89,6 @@
     "vite": "^5.0.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
     "@letta-ai/letta-client": "^0.1.102",
     "@radix-ui/react-scroll-area": "^1.2.4",
     "@radix-ui/react-slot": "^1.2.0",

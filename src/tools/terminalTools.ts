@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import Anthropic from '@anthropic-ai/sdk';
 import * as child_process from 'child_process';
 
-export const terminalTools: Anthropic.Tool[] = [
+// Define tool schema in Letta-compatible format
+export const terminalTools = [
   {
     name: "run_command",
     description: "Executes the specified terminal command in the VS Code integrated terminal. Use this to run git commands, build commands, or any other CLI commands that would normally be run in a terminal.",

@@ -69,7 +69,7 @@
     - `src/extension.ts`: minor import adjustments  
   - **Step Dependencies**: 3.1
 
-- [ ] Step 3.3: Remove old Anthropic integration  
+- [x] Step 3.3: Remove old Anthropic integration  
   - **Task**: Uninstall `@anthropic-ai/sdk`, delete `ChatService.ts`, and clean up related imports.  
   - **Description**: Cleans obsolete code and dependencies now replaced by Letta.  
   - **Files**:  
@@ -135,4 +135,3 @@
     - `README.md`  
   - **Step Dependencies**: all previous steps  
   - **User Instructions**: After merge, review README and try extension in a fresh workspace.
-
