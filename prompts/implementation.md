@@ -44,7 +44,7 @@
     - `src/services/LettaService.ts`: update to include agent registry logic  
   - **Step Dependencies**: 2.1
 
-- [ ] Step 2.3: Register VS Code tools with Letta agent  
+- [x] Step 2.3: Register VS Code tools with Letta agent  
   - **Task**: At agent creation, call Letta SDK to register `fileTools` and `terminalTools` specs as agent tools.  
   - **Description**: Enables the agent to invoke the existing file/terminal operations via Letta’s built-in tool system.  
   - **Files**:  
@@ -54,7 +54,7 @@
   - **Step Dependencies**: 2.2
 
 ## 3 – Chat Flow Refactor
-- [ ] Step 3.1: Build `ChatAdapter` for Letta streaming  
+- [x] Step 3.1: Build `ChatAdapter` for Letta streaming  
   - **Task**: Create `src/services/ChatAdapter.ts` to wrap `LettaService.sendMessage()`, handle streaming tokens and tool-use blocks, and emit events matching existing UI protocol.  
   - **Description**: Abstracts Letta-specific messaging into an adapter that the UI code can consume without changes.  
   - **Files**:  
