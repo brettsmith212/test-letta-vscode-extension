@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { LettaClient } from '@letta-ai/letta-client';
-import { isDockerInstalled, runLettaContainer, checkLettaHealth } from '../utils/dockerHelper';
 import * as crypto from 'crypto';
 import { fileTools } from '../tools/fileTools';
 import { terminalTools } from '../tools/terminalTools';
@@ -39,73 +38,28 @@ export class LettaService {
     this.context = context;
     
     try {
-      // We'll skip the server check since we know it's running manually
-      // await this.ensureServer();
-      
       // Create Letta client
       const config = vscode.workspace.getConfiguration('lettaChat');
       const serverUrl = config.get<string>('serverUrl') || 'http://localhost:8283';
       
       console.log(`Initializing Letta client with server URL: ${serverUrl}`);
-      this.client = new LettaClient({
-        baseUrl: serverUrl,
-      });
-      
-      // Attempt to restore persona block ID from global state
+      this.client = new LettaClient({ baseUrl: serverUrl });
+
+      // Restore persona block ID
       this.personaBlockId = context.globalState.get<string>('lettaPersonaBlockId') || null;
       
-      // Restore workspace agent mappings from global state
+      // Restore saved workspace-agent mappings
       const savedMappings = context.globalState.get<Record<string, {agentId: string, projectBlockId: string}>>('lettaWorkspaceAgents') || {};
       Object.entries(savedMappings).forEach(([key, value]) => {
         this.workspaceAgentMap.set(key, value);
       });
       
       this.initialized = true;
-      
     } catch (error) {
       console.error('Failed to initialize LettaService:', error);
       vscode.window.showErrorMessage('Failed to initialize Letta service');
       throw error;
     }
-  }
-
-  /**
-   * Ensure the Letta server is running
-   */
-  public async ensureServer(): Promise<void> {
-    // Skipping Docker check since we know it's running
-    // Instead, just show a message that we're connecting to the existing server
-    vscode.window.showInformationMessage('Connecting to existing Letta server on port 8283...');
-    
-    /* Original implementation commented out
-    // Check if Docker is available
-    const dockerAvailable = await isDockerInstalled();
-    if (!dockerAvailable) {
-      throw new Error('Docker is not installed or not running');
-    }
-    
-    // Check if Letta server is healthy
-    const isHealthy = await checkLettaHealth();
-    if (!isHealthy) {
-      // If not healthy, try to start the container
-      await runLettaContainer();
-      
-      // Wait for server to be ready (up to 30 seconds)
-      const maxRetries = 15;
-      let retries = 0;
-      let serverReady = false;
-      
-      while (retries < maxRetries && !serverReady) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
-        serverReady = await checkLettaHealth();
-        retries++;
-      }
-      
-      if (!serverReady) {
-        throw new Error('Failed to start Letta server after multiple attempts');
-      }
-    }
-    */
   }
 
   /**
@@ -126,27 +80,20 @@ export class LettaService {
       throw new Error('LettaService not initialized with context');
     }
     
-    // If we already have a persona block ID, return it
     if (this.personaBlockId) {
       return this.personaBlockId;
     }
     
     try {
       const client = this.getClient();
-      
-      // Create a persona block with VS Code assistant persona information
       const block = await client.blocks.create({
         value: `You are a helpful VS Code extension assistant named Letta. You help users with coding tasks, answer questions about their code, and provide assistance with VS Code features. Be concise, friendly, and focus on providing accurate technical information.`,
         label: 'VSCodePersona'
       });
-      
       this.personaBlockId = block.id || null;
-      
-      // Store the block ID in extension's global state
       if (block.id) {
         await this.context.globalState.update('lettaPersonaBlockId', block.id);
       }
-      
       return block.id || '';
     } catch (error) {
       console.error('Failed to create persona block:', error);
@@ -156,100 +103,72 @@ export class LettaService {
 
   /**
    * Gets or creates an agent for a specific workspace
-   * @param workspaceUri The URI of the workspace
-   * @returns Promise resolving to agent ID and project block ID
    */
   public async getAgentForWorkspace(workspaceUri: vscode.Uri): Promise<{agentId: string, projectBlockId: string}> {
     if (!this.context) {
       throw new Error('LettaService not initialized with context');
     }
 
-    // Get workspace key
     const workspaceKey = this.getWorkspaceKey(workspaceUri);
-    
-    // Check if we already have an agent for this workspace
-    const existingAgent = this.workspaceAgentMap.get(workspaceKey);
-    if (existingAgent) {
-      return existingAgent;
+    const existing = this.workspaceAgentMap.get(workspaceKey);
+    if (existing) {
+      return existing;
     }
 
     try {
       const client = this.getClient();
       const personaBlockId = await this.getOrCreatePersonaBlock();
       
-      // Create project block for this workspace
+      // Create a project-specific memory block
       const workspaceName = workspaceUri.fsPath.split('/').pop() || 'Workspace';
       const projectBlock = await client.blocks.create({
         value: `This is the project memory for the ${workspaceName} workspace.`,
         label: `${workspaceName}ProjectMemory`
       });
 
-      // Create agent with persona and project blocks
+      // Read config
+      const config = vscode.workspace.getConfiguration('lettaChat');
+      const model = config.get<string>('model') || 'openai/gpt-4o';
+      const embeddingModel = config.get<string>('embeddingModel') || 'openai/text-embedding-3-large';
+
+      // Create the agent, passing `embedding` (string) to satisfy the API
       const agent = await client.agents.create({
         name: `VSCode-${workspaceName}-Agent`,
         description: `VS Code agent for the ${workspaceName} workspace`,
         blockIds: [personaBlockId, projectBlock.id || ''],
-        model: vscode.workspace.getConfiguration('lettaChat').get<string>('model') || 'openai/gpt-4o'
-      });
+        model,
+        embedding: embeddingModel
+      } as any);
 
-      // Register VS Code tools with the agent
+      // Attach file and terminal tools
       if (agent.id) {
-        // Create and attach file tools
         for (const tool of fileTools) {
-          const createdTool = await client.tools.create({
+          const created = await client.tools.create({
             description: tool.description,
-            sourceCode: JSON.stringify({
-              name: tool.name,
-              description: tool.description,
-              parameters: tool.input_schema
-            }),
+            sourceCode: JSON.stringify({ name: tool.name, description: tool.description, parameters: tool.input_schema }),
             sourceType: 'function',
-            jsonSchema: {
-              name: tool.name,
-              description: tool.description,
-              parameters: tool.input_schema
-            }
+            jsonSchema: { name: tool.name, description: tool.description, parameters: tool.input_schema }
           });
-          
-          if (createdTool.id) {
-            await client.agents.tools.attach(agent.id, createdTool.id);
+          if (created.id) {
+            await client.agents.tools.attach(agent.id, created.id);
           }
         }
-        
-        // Create and attach terminal tools
         for (const tool of terminalTools) {
-          const createdTool = await client.tools.create({
+          const created = await client.tools.create({
             description: tool.description,
-            sourceCode: JSON.stringify({
-              name: tool.name,
-              description: tool.description,
-              parameters: tool.input_schema
-            }),
+            sourceCode: JSON.stringify({ name: tool.name, description: tool.description, parameters: tool.input_schema }),
             sourceType: 'function',
-            jsonSchema: {
-              name: tool.name,
-              description: tool.description,
-              parameters: tool.input_schema
-            }
+            jsonSchema: { name: tool.name, description: tool.description, parameters: tool.input_schema }
           });
-          
-          if (createdTool.id) {
-            await client.agents.tools.attach(agent.id, createdTool.id);
+          if (created.id) {
+            await client.agents.tools.attach(agent.id, created.id);
           }
         }
       }
 
-      // Store the mapping
-      const agentData = {
-        agentId: agent.id || '',
-        projectBlockId: projectBlock.id || ''
-      };
-      
+      const agentData = { agentId: agent.id || '', projectBlockId: projectBlock.id || '' };
       this.workspaceAgentMap.set(workspaceKey, agentData);
-      
-      // Persist to global state
       await this.saveWorkspaceAgentMap();
-      
       return agentData;
     } catch (error) {
       console.error('Failed to create agent for workspace:', error);
@@ -257,30 +176,16 @@ export class LettaService {
     }
   }
 
-  /**
-   * Computes a stable key for the workspace based on its path
-   * @param workspaceUri The workspace URI
-   * @returns A SHA-256 hash of the workspace path
-   */
+  /** Hash the workspace path to form a stable key */
   private getWorkspaceKey(workspaceUri: vscode.Uri): string {
-    return crypto.createHash('sha256')
-      .update(workspaceUri.fsPath)
-      .digest('hex');
+    return crypto.createHash('sha256').update(workspaceUri.fsPath).digest('hex');
   }
 
-  /**
-   * Saves the workspace agent map to global state
-   */
+  /** Persist the workspace-agent map */
   private async saveWorkspaceAgentMap(): Promise<void> {
-    if (!this.context) {
-      return;
-    }
-    
-    const mappingsObject: Record<string, {agentId: string, projectBlockId: string}> = {};
-    this.workspaceAgentMap.forEach((value, key) => {
-      mappingsObject[key] = value;
-    });
-    
-    await this.context.globalState.update('lettaWorkspaceAgents', mappingsObject);
+    if (!this.context) return;
+    const obj: Record<string, {agentId: string, projectBlockId: string}> = {};
+    this.workspaceAgentMap.forEach((v, k) => obj[k] = v);
+    await this.context.globalState.update('lettaWorkspaceAgents', obj);
   }
 }

@@ -30,7 +30,7 @@
         },
         "lettaChat.model": {
           "type": "string",
-          "default": "openai/gpt-4o",
+          "default": "letta/letta-free",
           "description": "Model to use for chat completion"
         },
         "lettaChat.embeddingModel": {
