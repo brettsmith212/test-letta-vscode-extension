@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { LettaClient } from '@letta-ai/letta-client';
 import { isDockerInstalled, runLettaContainer, checkLettaHealth } from '../utils/dockerHelper';
 import * as crypto from 'crypto';
+import { fileTools } from '../tools/fileTools';
+import { terminalTools } from '../tools/terminalTools';
 
 /**
  * Singleton service for managing Letta client and server
@@ -181,6 +183,53 @@ export class LettaService {
         blockIds: [personaBlockId, projectBlock.id || ''],
         model: vscode.workspace.getConfiguration('lettaChat').get<string>('model') || 'openai/gpt-4o'
       });
+
+      // Register VS Code tools with the agent
+      if (agent.id) {
+        // Create and attach file tools
+        for (const tool of fileTools) {
+          const createdTool = await client.tools.create({
+            description: tool.description,
+            sourceCode: JSON.stringify({
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.input_schema
+            }),
+            sourceType: 'function',
+            jsonSchema: {
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.input_schema
+            }
+          });
+          
+          if (createdTool.id) {
+            await client.agents.tools.attach(agent.id, createdTool.id);
+          }
+        }
+        
+        // Create and attach terminal tools
+        for (const tool of terminalTools) {
+          const createdTool = await client.tools.create({
+            description: tool.description,
+            sourceCode: JSON.stringify({
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.input_schema
+            }),
+            sourceType: 'function',
+            jsonSchema: {
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.input_schema
+            }
+          });
+          
+          if (createdTool.id) {
+            await client.agents.tools.attach(agent.id, createdTool.id);
+          }
+        }
+      }
 
       // Store the mapping
       const agentData = {
