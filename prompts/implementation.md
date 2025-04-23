@@ -61,7 +61,7 @@
     - `src/services/ChatAdapter.ts`: new  
   - **Step Dependencies**: 2.3
 
-- [ ] Step 3.2: Wire `ChatPanel` to `ChatAdapter`  
+- [x] Step 3.2: Wire `ChatPanel` to `ChatAdapter`  
   - **Task**: Replace instantiation of `ChatService` with `ChatAdapter` in `ChatPanel`, adjust method calls to use Letta-based streams.  
   - **Description**: Connects the UI to the new Letta-powered message flow.  
   - **Files**:  
