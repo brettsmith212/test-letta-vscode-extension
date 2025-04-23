@@ -37,7 +37,7 @@
       - `getOrCreatePersonaBlock(): Promise<string>`  
   - **Step Dependencies**: 1.1
 
-- [ ] Step 2.2: Implement workspace agent mapping  
+- [x] Step 2.2: Implement workspace agent mapping  
   - **Task**: In `LettaService`, add `getAgentForWorkspace(workspaceUri: Uri): Promise<{agentId:string, projectBlockId:string}>`.  
   - **Description**: Computes SHA-256 of `workspaceUri.fsPath`, looks up or creates agent, attaches persona & project blocks, and persists mapping in `globalState`.  
   - **Files**:  

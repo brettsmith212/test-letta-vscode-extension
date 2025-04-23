@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { LettaClient } from '@letta-ai/letta-client';
 import { isDockerInstalled, runLettaContainer, checkLettaHealth } from '../utils/dockerHelper';
+import * as crypto from 'crypto';
 
 /**
  * Singleton service for managing Letta client and server
@@ -11,6 +12,7 @@ export class LettaService {
   private initialized = false;
   private personaBlockId: string | null = null;
   private context: vscode.ExtensionContext | null = null;
+  private workspaceAgentMap: Map<string, {agentId: string, projectBlockId: string}> = new Map();
 
   private constructor() {}
 
@@ -47,6 +49,12 @@ export class LettaService {
       
       // Attempt to restore persona block ID from global state
       this.personaBlockId = context.globalState.get<string>('lettaPersonaBlockId') || null;
+      
+      // Restore workspace agent mappings from global state
+      const savedMappings = context.globalState.get<Record<string, {agentId: string, projectBlockId: string}>>('lettaWorkspaceAgents') || {};
+      Object.entries(savedMappings).forEach(([key, value]) => {
+        this.workspaceAgentMap.set(key, value);
+      });
       
       this.initialized = true;
       
@@ -118,14 +126,9 @@ export class LettaService {
       
       // Create a persona block with VS Code assistant persona information
       const block = await client.blocks.create({
-        type: 'text',
-        content: `You are a helpful VS Code extension assistant named Letta. You help users with coding tasks, answer questions about their code, and provide assistance with VS Code features. Be concise, friendly, and focus on providing accurate technical information.`,
-        metadata: {
-          name: 'VSCodePersona',
-          description: 'VS Code assistant persona',
-          type: 'persona'
-        }
-      } as any);
+        value: `You are a helpful VS Code extension assistant named Letta. You help users with coding tasks, answer questions about their code, and provide assistance with VS Code features. Be concise, friendly, and focus on providing accurate technical information.`,
+        label: 'VSCodePersona'
+      });
       
       this.personaBlockId = block.id || null;
       
@@ -139,5 +142,91 @@ export class LettaService {
       console.error('Failed to create persona block:', error);
       throw error;
     }
+  }
+
+  /**
+   * Gets or creates an agent for a specific workspace
+   * @param workspaceUri The URI of the workspace
+   * @returns Promise resolving to agent ID and project block ID
+   */
+  public async getAgentForWorkspace(workspaceUri: vscode.Uri): Promise<{agentId: string, projectBlockId: string}> {
+    if (!this.context) {
+      throw new Error('LettaService not initialized with context');
+    }
+
+    // Get workspace key
+    const workspaceKey = this.getWorkspaceKey(workspaceUri);
+    
+    // Check if we already have an agent for this workspace
+    const existingAgent = this.workspaceAgentMap.get(workspaceKey);
+    if (existingAgent) {
+      return existingAgent;
+    }
+
+    try {
+      const client = this.getClient();
+      const personaBlockId = await this.getOrCreatePersonaBlock();
+      
+      // Create project block for this workspace
+      const workspaceName = workspaceUri.fsPath.split('/').pop() || 'Workspace';
+      const projectBlock = await client.blocks.create({
+        value: `This is the project memory for the ${workspaceName} workspace.`,
+        label: `${workspaceName}ProjectMemory`
+      });
+
+      // Create agent with persona and project blocks
+      const agent = await client.agents.create({
+        name: `VSCode-${workspaceName}-Agent`,
+        description: `VS Code agent for the ${workspaceName} workspace`,
+        memory: {
+          personaBlockId: personaBlockId,
+          projectBlockId: projectBlock.id || '',
+        },
+        model: vscode.workspace.getConfiguration('lettaChat').get<string>('model') || 'openai/gpt-4o'
+      });
+
+      // Store the mapping
+      const agentData = {
+        agentId: agent.id || '',
+        projectBlockId: projectBlock.id || ''
+      };
+      
+      this.workspaceAgentMap.set(workspaceKey, agentData);
+      
+      // Persist to global state
+      await this.saveWorkspaceAgentMap();
+      
+      return agentData;
+    } catch (error) {
+      console.error('Failed to create agent for workspace:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Computes a stable key for the workspace based on its path
+   * @param workspaceUri The workspace URI
+   * @returns A SHA-256 hash of the workspace path
+   */
+  private getWorkspaceKey(workspaceUri: vscode.Uri): string {
+    return crypto.createHash('sha256')
+      .update(workspaceUri.fsPath)
+      .digest('hex');
+  }
+
+  /**
+   * Saves the workspace agent map to global state
+   */
+  private async saveWorkspaceAgentMap(): Promise<void> {
+    if (!this.context) {
+      return;
+    }
+    
+    const mappingsObject: Record<string, {agentId: string, projectBlockId: string}> = {};
+    this.workspaceAgentMap.forEach((value, key) => {
+      mappingsObject[key] = value;
+    });
+    
+    await this.context.globalState.update('lettaWorkspaceAgents', mappingsObject);
   }
 }
