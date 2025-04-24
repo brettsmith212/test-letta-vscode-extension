@@ -97,6 +97,7 @@
   },
   "dependencies": {
     "@letta-ai/letta-client": "^0.1.102",
+    "@modelcontextprotocol/sdk": "^0.5.0",
     "@radix-ui/react-scroll-area": "^1.2.4",
     "@radix-ui/react-slot": "^1.2.0",
     "@radix-ui/react-toast": "^1.2.7",
@@ -111,6 +112,7 @@
     "react-dom": "^18.0.0",
     "react-markdown": "^10.0.0",
     "tailwind-merge": "^3.2.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.22.4"
   }
 }

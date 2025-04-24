@@ -6,6 +6,7 @@
     "rootDir": "src",
     "sourceMap": true,
     "strict": true,
+    "esModuleInterop": true,
     "lib": ["es2020", "DOM", "DOM.Iterable"],
     "types": ["node", "vscode"],
     "baseUrl": ".",
