@@ -8,7 +8,7 @@ This project is a VS Code extension that integrates with the Letta agent framewo
 - `npm run compile` - Compile TypeScript files
 - `npm run watch` - Watch TypeScript files and compile on change
 - `npm run build:webviews` - Build webview UI components
-- `npm run watch:webviews` - Watch and build webview UI on change 
+- `npm run watch:webviews` - Watch and build webview UI on change
 - `npm run start:letta` - Start the Letta container
 
 ## Progress Tracking
@@ -17,26 +17,6 @@ When you complete a step be sure to mark it completed in implementation.md as we
 ## Helpful Notes
 - Always import letta sdk as `@letta-ai/letta-client`
 - When implementing the letta sdk use `prompts/letta-sdk-documentation.md` as a reference
-
-### Completed
-- [x] Step 1.1: Added Letta SDK and Docker CLI helper
-  - Added `@letta/sdk` and `dockerode` dependencies
-  - Created Docker helper utilities in `src/utils/dockerHelper.ts`
-  - Added start:letta script to package.json
-
-- [x] Step 1.2: Added VS Code settings schema
-  - Extended package.json with `lettaChat.*` settings
-
-- [x] Step 2.1: Created LettaService singleton
-  - Created service with initialize(), ensureServer(), getClient(), and getOrCreatePersonaBlock() methods
-  - Implemented Docker health checks and server startup
-  - Added persona block creation and global state persistence
-
-- [x] Step 2.2: Implemented workspace agent mapping
-  - Added getAgentForWorkspace() method to map workspaces to Letta agents
-  - Implemented SHA-256 workspace key generation for stable identifiers
-  - Added project block creation and agent registration with persona/project blocks
-  - Implemented persistence of workspace-agent mappings in global state
-
-### Next Steps
-- [ ] Step 2.3: Register VS Code tools with Letta agent
+- Also if possible, search .node_modules for dependencies help when you need type help.
+- For tools, we're now using the MCP server approach (Model Context Protocol) which exposes VSCode-powered tools to Letta via a local HTTP server on port 7428
+- The MCP server starts automatically when the extension starts and is shut down when the extension is deactivated
