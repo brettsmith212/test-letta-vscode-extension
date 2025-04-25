@@ -22,7 +22,7 @@
     - `src/mcp/toolRegistry.ts`  
     - `src/services/ChatAdapter.ts`
 
-- [ ] Step 2.2: Single-source JSON/Zod schemas
+- [x] Step 2.2: Single-source JSON/Zod schemas
   - **Task**: Export each tool definition as `{ name, description, zod, jsonSchema }` and import from registry.
   - **Files**:  
     - `src/tools/terminalTools.ts`  

@@ -254,7 +254,7 @@ export class LettaService {
         'read_file',
         'search_files',
         'list_files',
-        'execute_command',
+        'run_command',  // Use consistent name with toolRegistry.ts
         'read_terminal_output'
       ];
 

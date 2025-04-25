@@ -56,12 +56,23 @@ export async function checkLettaHealth(): Promise<boolean> {
     
     console.log(`Checking Letta health at ${serverUrl}/health...`);
     // Try to connect to the health endpoint
-    const response = await fetch(`${serverUrl}/health`);
+    const response = await fetch(`${serverUrl}/health`, {
+      // Add timeout to avoid hanging if server is unreachable
+      signal: AbortSignal.timeout(5000)
+    });
+    
     const healthy = response.ok;
     console.log(`Letta health check result: ${healthy}`);
+    if (healthy) {
+      // If healthy, show a status message
+      vscode.window.setStatusBarMessage('Letta: Connected', 5000);
+    } else {
+      vscode.window.setStatusBarMessage('Letta: Connection failed', 5000);
+    }
     return healthy;
   } catch (error: any) {
     console.error('Letta health check failed:', error);
+    vscode.window.setStatusBarMessage('Letta: Connection error', 5000);
     return false;
   }
 }

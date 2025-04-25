@@ -163,13 +163,30 @@ class McpExpressServer {
   }
 
   public start(): Promise<void> {
-    return new Promise((resolve) => {
-      this.server = this.app.listen(PORT, () => {
-        console.log(`MCP server started on port ${PORT}`);
-        // Write config so Letta knows where to find our server
-        writeMcpConfig();
-        resolve();
-      });
+    return new Promise((resolve, reject) => {
+      try {
+        console.log(`Attempting to start MCP server on port ${PORT}...`);
+        this.server = this.app.listen(PORT, () => {
+          console.log(`MCP server started successfully on port ${PORT}`);
+          // Write config so Letta knows where to find our server
+          writeMcpConfig();
+          resolve();
+        });
+
+        // Add error handler to the server
+        this.server.on('error', (err) => {
+          console.error(`Failed to start MCP server: ${err.message}`);
+          // Most common error is port already in use (EADDRINUSE)
+          if ((err as any).code === 'EADDRINUSE') {
+            console.error(`Port ${PORT} is already in use. Maybe another instance is running?`);
+            vscode.window.showErrorMessage(`Cannot start MCP server: Port ${PORT} is already in use. Maybe another instance of Letta is running?`);
+          }
+          reject(err);
+        });
+      } catch (error) {
+        console.error('Unexpected error starting MCP server:', error);
+        reject(error);
+      }
     });
   }
 
