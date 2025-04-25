@@ -60,7 +60,7 @@ const readTerminalOutputSchema = z.object({
 export const toolRegistry: ToolDefinition[] = [
   // Terminal Tools
   {
-    name: 'execute_command',
+    name: 'run_command',
     description: terminalTools[0].description,
     schema: commandSchema,
     // Handler delegates to the existing executeTerminalTool function

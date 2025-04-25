@@ -14,7 +14,7 @@
     - `src/extension.ts` (register command)
 
 ## 2 — Tool registry consistency
-- [ ] Step 2.1: Canonicalise tool names
+- [x] Step 2.1: Canonicalise tool names
   - **Task**: Pick **`run_command`** (shorter). Rename everywhere:
     - `terminalTools`, `toolRegistry`, and `ChatAdapter.handleToolUse`.
   - **Files**:  
