@@ -4,8 +4,21 @@ import { executeTerminalTool } from '../tools/terminalTools';
 import { executeTool } from '../tools/fileTools';
 
 // Import schemas from tools
-import { terminalTools } from '../tools/terminalTools';
-import { fileTools } from '../tools/fileTools';
+import { 
+  terminalTools, 
+  runCommandSchema, 
+  readTerminalOutputSchema
+} from '../tools/terminalTools';
+
+import { 
+  fileTools,
+  createFileSchema,
+  updateFileSchema,
+  deleteFileSchema,
+  readFileSchema,
+  searchFilesSchema,
+  listFilesSchema
+} from '../tools/fileTools';
 
 // Type for tool registry entries
 export type ToolDefinition = {
@@ -15,43 +28,7 @@ export type ToolDefinition = {
   handler: (params: any) => Promise<any>;
 };
 
-// Convert JSON schema to zod schema
-const commandSchema = z.object({
-  command: z.string().describe("The command to execute in the terminal. Should be a valid shell command."),
-  cwd: z.string().optional().describe("Optional. The current working directory where the command should be executed. If not provided, the workspace root will be used."),
-  captureOutput: z.boolean().optional().describe("Optional. Whether to capture the output of the command. If true, the command will be run in a way that captures output, if false it just runs in the terminal visibly. Default is false.")
-});
-
-// Create zod schemas for file operations
-const createFileSchema = z.object({
-  path: z.string().describe("The relative path to the file, e.g., 'src/newfile.ts'"),
-  content: z.string().describe("The content to write to the file")
-});
-
-const updateFileSchema = z.object({
-  path: z.string().describe("The relative path to the file"),
-  content: z.string().describe("The new content to write to the file")
-});
-
-const deleteFileSchema = z.object({
-  path: z.string().describe("The relative path to the file")
-});
-
-const readFileSchema = z.object({
-  path: z.string().describe("The file name or relative path to the file")
-});
-
-const searchFilesSchema = z.object({
-  query: z.string().describe("The search query string")
-});
-
-const listFilesSchema = z.object({
-  maxResults: z.number().optional().describe("Maximum number of files to return (default: 100)")
-});
-
-const readTerminalOutputSchema = z.object({
-  maxLines: z.number().optional().describe("Optional. Maximum number of lines to read from the terminal output.")
-});
+// All schemas are now imported from their respective tool modules
 
 /**
  * Tool registry for the MCP server
@@ -62,9 +39,9 @@ export const toolRegistry: ToolDefinition[] = [
   {
     name: 'run_command',
     description: terminalTools[0].description,
-    schema: commandSchema,
+    schema: runCommandSchema,
     // Handler delegates to the existing executeTerminalTool function
-    handler: async (params: z.infer<typeof commandSchema>) => {
+    handler: async (params: z.infer<typeof runCommandSchema>) => {
       // Check if the user approved the command execution
       const approved = await showCommandApprovalDialog(params.command);
       if (!approved) {

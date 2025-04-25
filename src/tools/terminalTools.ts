@@ -1,43 +1,64 @@
 import * as vscode from 'vscode';
 import * as child_process from 'child_process';
+import { z } from 'zod';
 
-// Define tool schema in Letta-compatible format
+// Define Zod schemas for terminal tools
+export const runCommandSchema = z.object({
+  command: z.string().describe("The command to execute in the terminal. Should be a valid shell command."),
+  cwd: z.string().optional().describe("Optional. The current working directory where the command should be executed. If not provided, the workspace root will be used."),
+  captureOutput: z.boolean().optional().describe("Optional. Whether to capture the output of the command. If true, the command will be run in a way that captures output, if false it just runs in the terminal visibly. Default is false.")
+});
+
+export const readTerminalOutputSchema = z.object({
+  maxLines: z.number().optional().describe("Optional. Maximum number of lines to read from the terminal output. If not specified, will return all available output.")
+});
+
+// JSON Schema versions for tools
+export const runCommandJsonSchema = {
+  type: "object",
+  properties: {
+    command: {
+      type: "string",
+      description: "The command to execute in the terminal. Should be a valid shell command."
+    },
+    cwd: {
+      type: "string",
+      description: "Optional. The current working directory where the command should be executed. If not provided, the workspace root will be used."
+    },
+    captureOutput: {
+      type: "boolean",
+      description: "Optional. Whether to capture the output of the command. If true, the command will be run in a way that captures output, if false it just runs in the terminal visibly. Default is false."
+    }
+  },
+  required: ["command"]
+};
+
+export const readTerminalOutputJsonSchema = {
+  type: "object",
+  properties: {
+    maxLines: {
+      type: "number",
+      description: "Optional. Maximum number of lines to read from the terminal output. If not specified, will return all available output."
+    }
+  },
+  required: []
+};
+
+// Define tool schema in Letta-compatible format with single-source definitions
 export const terminalTools = [
   {
     name: "run_command",
     description: "Executes the specified terminal command in the VS Code integrated terminal. Use this to run git commands, build commands, or any other CLI commands that would normally be run in a terminal.",
-    input_schema: {
-      type: "object",
-      properties: {
-        command: {
-          type: "string",
-          description: "The command to execute in the terminal. Should be a valid shell command."
-        },
-        cwd: {
-          type: "string",
-          description: "Optional. The current working directory where the command should be executed. If not provided, the workspace root will be used."
-        },
-        captureOutput: {
-          type: "boolean",
-          description: "Optional. Whether to capture the output of the command. If true, the command will be run in a way that captures output, if false it just runs in the terminal visibly. Default is false."
-        }
-      },
-      required: ["command"]
-    }
+    zod: runCommandSchema,
+    jsonSchema: runCommandJsonSchema,
+    input_schema: runCommandJsonSchema
   },
   {
     name: "read_terminal_output",
     description: "Reads the output from the most recently executed terminal command if it was run with captureOutput=true. This allows analysis of command output to determine next steps. Useful for git status, npm outputs, curl responses, etc.",
-    input_schema: {
-      type: "object",
-      properties: {
-        maxLines: {
-          type: "number",
-          description: "Optional. Maximum number of lines to read from the terminal output. If not specified, will return all available output."
-        }
-      },
-      required: []
-    }
+    zod: readTerminalOutputSchema,
+    jsonSchema: readTerminalOutputJsonSchema,
+    input_schema: readTerminalOutputJsonSchema
   }
 ];
 

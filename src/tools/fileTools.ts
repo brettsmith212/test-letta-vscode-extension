@@ -1,76 +1,129 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { z } from 'zod';
 
-// Define tool schema in Letta-compatible format
+// Define Zod schemas for file tools
+export const createFileSchema = z.object({
+  path: z.string().describe("The relative path to the file, e.g., 'src/newfile.ts'"),
+  content: z.string().describe("The content to write to the file")
+});
+
+export const updateFileSchema = z.object({
+  path: z.string().describe("The relative path to the file"),
+  content: z.string().describe("The new content to write to the file")
+});
+
+export const deleteFileSchema = z.object({
+  path: z.string().describe("The relative path to the file")
+});
+
+export const readFileSchema = z.object({
+  path: z.string().describe("The file name or relative path to the file")
+});
+
+export const searchFilesSchema = z.object({
+  query: z.string().describe("The search query string")
+});
+
+export const listFilesSchema = z.object({
+  maxResults: z.number().optional().describe("Maximum number of files to return (default: 100)")
+});
+
+// JSON Schema versions for tools
+export const createFileJsonSchema = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "The relative path to the file, e.g., 'src/newfile.ts'" },
+    content: { type: "string", description: "The content to write to the file" }
+  },
+  required: ["path", "content"]
+};
+
+export const updateFileJsonSchema = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "The relative path to the file" },
+    content: { type: "string", description: "The new content to write to the file" }
+  },
+  required: ["path", "content"]
+};
+
+export const deleteFileJsonSchema = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "The relative path to the file" }
+  },
+  required: ["path"]
+};
+
+export const readFileJsonSchema = {
+  type: "object",
+  properties: {
+    path: { type: "string", description: "The file name or relative path to the file" }
+  },
+  required: ["path"]
+};
+
+export const searchFilesJsonSchema = {
+  type: "object",
+  properties: {
+    query: { type: "string", description: "The search query string" }
+  },
+  required: ["query"]
+};
+
+export const listFilesJsonSchema = {
+  type: "object",
+  properties: {
+    maxResults: { type: "number", description: "Maximum number of files to return (default: 100)", default: 100 }
+  },
+  required: []
+};
+
+// Define tool schema in Letta-compatible format with single-source definitions
 export const fileTools = [
   {
     name: "create_file",
     description: "Creates a new file with the specified content at the given path, or overwrites it if it already exists. Use this when you need to create a new file or replace an existing one in the project. The path should be relative to the workspace root.",
-    input_schema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "The relative path to the file, e.g., 'src/newfile.ts'" },
-        content: { type: "string", description: "The content to write to the file" }
-      },
-      required: ["path", "content"]
-    }
+    zod: createFileSchema,
+    jsonSchema: createFileJsonSchema,
+    input_schema: createFileJsonSchema
   },
   {
     name: "update_file",
     description: "Updates the entire content of an existing file at the given path. Use this when you need to modify an existing file. The path should be relative to the workspace root. Note: This will replace the entire file content, so ensure the new content is complete and correct.",
-    input_schema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "The relative path to the file" },
-        content: { type: "string", description: "The new content to write to the file" }
-      },
-      required: ["path", "content"]
-    }
+    zod: updateFileSchema,
+    jsonSchema: updateFileJsonSchema,
+    input_schema: updateFileJsonSchema
   },
   {
     name: "delete_file",
     description: "Deletes the file at the given path. Use this when you need to remove a file from the project. The path should be relative to the workspace root.",
-    input_schema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "The relative path to the file" }
-      },
-      required: ["path"]
-    }
+    zod: deleteFileSchema,
+    jsonSchema: deleteFileJsonSchema,
+    input_schema: deleteFileJsonSchema
   },
   {
     name: "read_file",
     description: "Reads the content of a file by searching for it recursively in the workspace, including the root directory. Use this to inspect a file to answer a question or perform an action. Provide the file name (e.g., 'main.go') or a relative path (e.g., 'cmd/main.go'). If multiple files match, you will need to specify the full path. If you do not know the path, use the 'search_files' tool first to find the file before reading or operating on it.",
-    input_schema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "The file name or relative path to the file" }
-      },
-      required: ["path"]
-    }
+    zod: readFileSchema,
+    jsonSchema: readFileJsonSchema,
+    input_schema: readFileJsonSchema
   },
   {
     name: "search_files",
     description: "Searches for files in the workspace that match the given query. Returns a list of file paths. Use this tool to find the location of a file before operating on it if the path is not fully specified.",
-    input_schema: {
-      type: "object",
-      properties: {
-        query: { type: "string", description: "The search query string" }
-      },
-      required: ["query"]
-    }
+    zod: searchFilesSchema,
+    jsonSchema: searchFilesJsonSchema,
+    input_schema: searchFilesJsonSchema
   },
   {
     name: "list_files",
     description: "Lists all files in the workspace recursively, excluding node_modules, with diagnostics including readability status. Use this to verify which files are visible or accessible.",
-    input_schema: {
-      type: "object",
-      properties: {
-        maxResults: { type: "number", description: "Maximum number of files to return (default: 100)", default: 100 }
-      },
-      required: []
-    }
+    zod: listFilesSchema,
+    jsonSchema: listFilesJsonSchema,
+    input_schema: listFilesJsonSchema
   }
 ];
 
