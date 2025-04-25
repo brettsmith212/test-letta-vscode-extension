@@ -22,6 +22,14 @@
       {
         "command": "letta-ai.indexWorkspace",
         "title": "Letta AI: Index Workspace for Memory"
+      },
+      {
+        "command": "letta-ai.clearProjectMemory",
+        "title": "Letta AI: Clear Project Memory"
+      },
+      {
+        "command": "letta-ai.clearPersonaMemory",
+        "title": "Letta AI: Clear Persona Memory"
       }
     ],
     "configuration": {

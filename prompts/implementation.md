@@ -87,7 +87,7 @@
     - `src/extension.ts`: register new command
   - **Step Dependencies**: 2.3
 
-- [ ] Step 4.2: Add memory-flush commands
+- [x] Step 4.2: Add memory-flush commands
   - **Task**: Create `src/commands/flushMemory.ts` with two commands: clear project block and clear persona block. Register in `extension.ts`.
   - **Description**: Allows user to manually reset either memory tier.
   - **Files**:
