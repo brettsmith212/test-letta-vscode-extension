@@ -14,9 +14,27 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.commands.registerCommand('letta-ai.showErrorDetails', async () => {
         const config = vscode.workspace.getConfiguration('lettaChat');
         const serverUrl = config.get<string>('serverUrl') || 'http://localhost:8283';
+        
+        // Import getCurrentMcpPort here to avoid circular dependencies
+        const { getCurrentMcpPort } = require('./mcp/server');
+        const currentPort = getCurrentMcpPort() || 'Not started';
+        
+        // Try to connect to Letta and get detailed info
+        let connectionStatus = 'Unknown';
+        try {
+            const response = await fetch(serverUrl, { 
+                signal: AbortSignal.timeout(3000) 
+            });
+            connectionStatus = `${response.status} ${response.statusText}`;
+        } catch (error) {
+            connectionStatus = `Error: ${error instanceof Error ? error.message : String(error)}`;
+        }
+        
         vscode.window.showInformationMessage(
-            `Letta Server URL: ${serverUrl}\n` +
-            `To reconnect: Run 'Letta AI: Reconnect to Server' from command palette`
+            `Letta Server URL: ${serverUrl} (Connection Status: ${connectionStatus})\n` +
+            `VSCode MCP Server Port: ${currentPort} (should be different from Docker's 7428)\n` +
+            `Config File Location: ~/.letta/mcp_config.json\n` +
+            `To reconnect: Run 'Letta AI: Reconnect to Server' from the command palette`
         );
     }));
 
@@ -25,7 +43,7 @@ export async function activate(context: vscode.ExtensionContext) {
         // Start the MCP server
         console.log('Getting or creating MCP server...');
         const mcpServer = getOrCreateMcpServer();
-        console.log('Starting MCP server...');
+        console.log('Starting MCP server with port retry logic...');
         await mcpServer.start();
         console.log('MCP server started successfully');
         context.subscriptions.push({ dispose: () => mcpServer.stop() });

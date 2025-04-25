@@ -54,15 +54,16 @@ export async function checkLettaHealth(): Promise<boolean> {
     const config = vscode.workspace.getConfiguration('lettaChat');
     const serverUrl = config.get<string>('serverUrl') || `http://localhost:${LETTA_PORT}`;
     
-    console.log(`Checking Letta health at ${serverUrl}/health...`);
-    // Try to connect to the health endpoint
-    const response = await fetch(`${serverUrl}/health`, {
+    // Try a generic connection test to the root endpoint since /health returned 404
+    console.log(`Checking Letta connection at ${serverUrl}...`);
+    const response = await fetch(serverUrl, {
       // Add timeout to avoid hanging if server is unreachable
       signal: AbortSignal.timeout(5000)
     });
     
-    const healthy = response.ok;
-    console.log(`Letta health check result: ${healthy}`);
+    // Any response (even redirect) is considered healthy as long as the server responds
+    const healthy = response.status < 500; // Accept any non-server error as "healthy"
+    console.log(`Letta connection test result: ${healthy} (status: ${response.status})`);
     if (healthy) {
       // If healthy, show a status message
       vscode.window.setStatusBarMessage('Letta: Connected', 5000);
@@ -71,7 +72,7 @@ export async function checkLettaHealth(): Promise<boolean> {
     }
     return healthy;
   } catch (error: any) {
-    console.error('Letta health check failed:', error);
+    console.error('Letta connection test failed:', error);
     vscode.window.setStatusBarMessage('Letta: Connection error', 5000);
     return false;
   }
@@ -85,22 +86,38 @@ export async function checkLettaHealth(): Promise<boolean> {
  */
 export async function reconnectLetta(): Promise<boolean> {
   try {
+    // First attempt to kill any existing MCP server process
+    try {
+      console.log('Checking for existing MCP processes...');
+      // We can't directly kill processes from an extension, but we can attempt to restart ours
+      const mcpServer = getOrCreateMcpServer();
+      console.log('Stopping current MCP server if it exists...');
+      await mcpServer.stop();
+    } catch (stopError) {
+      console.warn('Error stopping existing MCP server:', stopError);
+      // Continue anyway
+    }
+
     // Check if Letta is healthy
     const isHealthy = await checkLettaHealth();
     if (!isHealthy) {
-      vscode.window.showErrorMessage('Letta server is not responding. Check if it is running correctly.');
+      vscode.window.showErrorMessage(
+        'Letta server is not responding. Make sure Docker is running and the container is started with "npm run start:letta" or the start_docker.sh script.',
+        'Show Details'
+      ).then(selection => {
+        if (selection === 'Show Details') {
+          vscode.commands.executeCommand('letta-ai.showErrorDetails');
+        }
+      });
       return false;
     }
     
-    // Re-write MCP config to ensure Letta can find our tools
-    writeMcpConfig();
-    
-    // Get MCP server instance (doesn't create a new one if already exists)
+    // Get MCP server instance and start it with retry logic (it will find an available port)
     const mcpServer = getOrCreateMcpServer();
-    
-    // Restart the MCP server to re-register tools
-    await mcpServer.stop();
+    console.log('Starting MCP server with port retry logic...');
     await mcpServer.start();
+    
+    // Config file is written by the start method when port is determined
     
     vscode.window.showInformationMessage('Successfully reconnected to Letta server');
     return true;

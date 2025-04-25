@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
-const MCP_PORT = 7428;
+const MCP_PORT = 7429; // Default port, different from Docker's 7428
 const MCP_CONFIG_FILENAME = 'mcp_config.json';
 const LETTA_CONFIG_DIR = '.letta';
 
@@ -24,17 +24,17 @@ function ensureLettaConfigDir(): string {
  * Creates or updates the MCP configuration file
  * This tells Letta where to find our tool server
  */
-export function writeMcpConfig(): void {
+export function writeMcpConfig(port: number = MCP_PORT): void {
   try {
     const configDir = ensureLettaConfigDir();
     const configPath = path.join(configDir, MCP_CONFIG_FILENAME);
     
     const config = {
-      endpoint: `http://host.docker.internal:${MCP_PORT}/mcp`
+      endpoint: `http://host.docker.internal:${port}/mcp`
     };
     
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-    console.log(`MCP config written to ${configPath}`);
+    console.log(`MCP config written to ${configPath} with port ${port}`);
   } catch (error) {
     console.error('Failed to write MCP config:', error);
   }

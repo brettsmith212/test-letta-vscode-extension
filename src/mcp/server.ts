@@ -8,14 +8,21 @@ import * as vscode from 'vscode';
 import { toolRegistry } from './toolRegistry';
 import { writeMcpConfig } from './config';
 
-const PORT = 7428; // MCP server port
+const DEFAULT_PORT = 7429; // Default MCP server port (different from Docker's 7428)
 
 class McpExpressServer {
+  /**
+   * Gets the current port the server is running on
+   */
+  public getPort(): number {
+    return this.port;
+  }
   private app = express();
   private server: ReturnType<typeof this.app.listen> | null = null;
   private transports: Record<string, StreamableHTTPServerTransport> = {};
   private sessions: Record<string, McpServer> = {};
   private disposables: vscode.Disposable[] = [];
+  private port: number = DEFAULT_PORT;
 
   constructor() {
     this.setupRoutes();
@@ -164,29 +171,56 @@ class McpExpressServer {
 
   public start(): Promise<void> {
     return new Promise((resolve, reject) => {
-      try {
-        console.log(`Attempting to start MCP server on port ${PORT}...`);
-        this.server = this.app.listen(PORT, () => {
-          console.log(`MCP server started successfully on port ${PORT}`);
-          // Write config so Letta knows where to find our server
-          writeMcpConfig();
-          resolve();
-        });
+      const tryPort = (port: number, maxRetries = 3, retryCount = 0) => {
+        try {
+          console.log(`Attempting to start MCP server on port ${port}...`);
+          this.server = this.app.listen(port, () => {
+            this.port = port;
+            console.log(`MCP server started successfully on port ${port}`);
+            // Write config with the actual port we're using
+            writeMcpConfig(port);
+            resolve();
+          });
 
-        // Add error handler to the server
-        this.server.on('error', (err) => {
-          console.error(`Failed to start MCP server: ${err.message}`);
-          // Most common error is port already in use (EADDRINUSE)
-          if ((err as any).code === 'EADDRINUSE') {
-            console.error(`Port ${PORT} is already in use. Maybe another instance is running?`);
-            vscode.window.showErrorMessage(`Cannot start MCP server: Port ${PORT} is already in use. Maybe another instance of Letta is running?`);
-          }
-          reject(err);
-        });
-      } catch (error) {
-        console.error('Unexpected error starting MCP server:', error);
-        reject(error);
-      }
+          // Add error handler to the server
+          this.server.on('error', (err) => {
+            // Most common error is port already in use (EADDRINUSE)
+            if ((err as any).code === 'EADDRINUSE') {
+              console.warn(`Port ${port} is already in use. ${retryCount < maxRetries ? 'Trying another port...' : 'Too many retries.'}`);
+              
+              // Close current failed server attempt
+              if (this.server) {
+                this.server.close();
+                this.server = null;
+              }
+              
+              // Try another port if we haven't exceeded max retries
+              if (retryCount < maxRetries) {
+                // Try a port higher by a small arbitrary offset, avoiding Docker's 7428
+                const nextPort = port + 1 + Math.floor(Math.random() * 10);
+                if (nextPort === 7428) { // Avoid Docker's port
+                  tryPort(7439, maxRetries, retryCount + 1); // Skip to higher range
+                } else {
+                  console.log(`Retrying with port ${nextPort}...`);
+                  tryPort(nextPort, maxRetries, retryCount + 1);
+                }
+              } else {
+                vscode.window.showErrorMessage(`Cannot start MCP server: All ports are in use. Please restart VS Code to release ports or check for running processes.`);
+                reject(err);
+              }
+            } else {
+              console.error(`Failed to start MCP server: ${err.message}`);
+              reject(err);
+            }
+          });
+        } catch (error) {
+          console.error('Unexpected error starting MCP server:', error);
+          reject(error);
+        }
+      };
+      
+      // Start with the default port
+      tryPort(DEFAULT_PORT);
     });
   }
 
@@ -283,4 +317,14 @@ export function getOrCreateMcpServer(): McpExpressServer {
     serverInstance = new McpExpressServer();
   }
   return serverInstance;
+}
+
+/**
+ * Gets the current port the MCP server is running on
+ */
+export function getCurrentMcpPort(): number | null {
+  if (!serverInstance) {
+    return null;
+  }
+  return serverInstance.getPort();
 }
