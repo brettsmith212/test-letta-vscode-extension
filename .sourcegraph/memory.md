@@ -3,6 +3,9 @@
 ## Project Structure
 This project is a VS Code extension that integrates with the Letta agent framework. It replaces the original Claude-based AI chat functionality with Letta-powered capabilities.
 
+## Expected Behavior of this Project
+I am building a VS Code extension that integrates with the Letta agent framework. The VSCode Extension sends the user requests to a Letta server running in a Docker container. This Letta server then makes the call to the llm model, and makes a call back to the VSCode Extension to access some MCP servers I have in the extension to run things like shell commands or list files in the project directory. The MCP server in the VSCode Extension then responds back to the Letta server in docker with the response, and the letta server processes and sends the llm response back to the VSCode Extension to be put in the UI.
+
 ## Important Commands
 - `npm install` - Install dependencies (remember to do this after adding new dependencies)
 - `npm run compile` - Compile TypeScript files

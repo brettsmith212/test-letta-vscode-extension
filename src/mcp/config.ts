@@ -30,7 +30,7 @@ export function writeMcpConfig(): void {
     const configPath = path.join(configDir, MCP_CONFIG_FILENAME);
     
     const config = {
-      endpoint: `http://localhost:${MCP_PORT}/mcp`
+      endpoint: `http://host.docker.internal:${MCP_PORT}/mcp`
     };
     
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
