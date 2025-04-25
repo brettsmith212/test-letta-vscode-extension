@@ -7,6 +7,14 @@ import { executeTool } from '../tools/fileTools';
 import { terminalTools } from '../tools/terminalTools';
 import { fileTools } from '../tools/fileTools';
 
+// Type for tool registry entries
+export type ToolDefinition = {
+  name: string;
+  description: string;
+  schema: any;
+  handler: (params: any) => Promise<any>;
+};
+
 // Convert JSON schema to zod schema
 const commandSchema = z.object({
   command: z.string().describe("The command to execute in the terminal. Should be a valid shell command."),
@@ -49,7 +57,7 @@ const readTerminalOutputSchema = z.object({
  * Tool registry for the MCP server
  * Each tool has a name, schema, and handler function
  */
-export const toolRegistry = [
+export const toolRegistry: ToolDefinition[] = [
   // Terminal Tools
   {
     name: 'execute_command',
