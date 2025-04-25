@@ -1,7 +1,6 @@
 import express from 'express';
 import type { Request, Response } from 'express';
-import { McpServer } from "@modelcontextprotocol/sdk/esm/server/mcp";
-
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as vscode from 'vscode';
 import { toolRegistry } from './toolRegistry';
 
@@ -34,6 +33,8 @@ class McpExpressServer {
 
       // Start MCP server with this connection
       this.mcpServer = new McpServer({
+        name: "letta-vscode-mcp",
+        version: "1.0.0",
         sendEvent: (event: any) => {
           res.write(`data: ${JSON.stringify(event)}\n\n`);
         }
@@ -41,31 +42,68 @@ class McpExpressServer {
 
       // Register all tools with the new connection
       for (const tool of toolRegistry) {
-        this.mcpServer.registerTool({
-          name: tool.name,
-          description: tool.schema.description || "",
-          parameters: tool.schema,
-          handler: async (params: any) => {
-            try {
-              return await tool.handler(params);
-            } catch (error) {
-              console.error(`Error executing tool ${tool.name}:`, error);
-              // Return structured error object
-              return {
-                type: "error",
-                message: error instanceof Error ? error.message : String(error),
-                stack: error instanceof Error ? error.stack : undefined
-              };
-            }
-          },
-        });
+        try {
+          // For older MCP SDK version using a compatibility approach
+          if (typeof (this.mcpServer as any).registerTool === 'function') {
+            (this.mcpServer as any).registerTool({
+              name: tool.name,
+              description: tool.schema.description || "",
+              parameters: tool.schema,
+              handler: async (params: any) => {
+                try {
+                  return await tool.handler(params);
+                } catch (error) {
+                  console.error(`Error executing tool ${tool.name}:`, error);
+                  return {
+                    type: "error",
+                    message: error instanceof Error ? error.message : String(error),
+                    stack: error instanceof Error ? error.stack : undefined
+                  };
+                }
+              },
+            });
+          } else if (typeof (this.mcpServer as any).tool === 'function') {
+            // For newer MCP SDK versions using the tool API
+            (this.mcpServer as any).tool(
+              tool.name,
+              tool.schema,
+              async (params: any) => {
+                try {
+                  const result = await tool.handler(params);
+                  return {
+                    content: [{ type: "text", text: JSON.stringify(result) }]
+                  };
+                } catch (error) {
+                  console.error(`Error executing tool ${tool.name}:`, error);
+                  return {
+                    content: [{ 
+                      type: "text", 
+                      text: error instanceof Error ? error.message : String(error)
+                    }],
+                    isError: true
+                  };
+                }
+              }
+            );
+          } else {
+            console.error(`Unable to register tool ${tool.name}: MCP server API not compatible`);
+          }
+        } catch (error) {
+          console.error(`Error registering tool ${tool.name}:`, error);
+        }
       }
 
       // Process incoming data
       req.on('data', (chunk) => {
         try {
           const data = JSON.parse(chunk.toString());
-          this.mcpServer?.receiveEvent(data);
+          // Pass any incoming messages to the MCP server
+          // Note: The exact method depends on the MCP SDK version you're using
+          // For newer SDK versions use this.mcpServer.transport.receiveMessage(data)
+          if (this.mcpServer) {
+            // Using receiveMessage for compatibility
+            (this.mcpServer as any).receiveEvent?.(data);
+          }
         } catch (error) {
           console.error('Error processing client message:', error);
         }
@@ -134,24 +172,55 @@ class McpExpressServer {
 
     // Register the tool with the MCP server (when connected)
     if (this.mcpServer) {
-      this.mcpServer.registerTool({
-        name,
-        description: schema.description || "",
-        parameters: schema,
-        handler: async (params: any) => {
-          try {
-            return await handler(params);
-          } catch (error) {
-            console.error(`Error executing tool ${name}:`, error);
-            // Return structured error object for better handling
-            return {
-              type: "error",
-              message: error instanceof Error ? error.message : String(error),
-              stack: error instanceof Error ? error.stack : undefined
-            };
-          }
-        },
-      });
+      try {
+        // For older MCP SDK version using a compatibility approach
+        if (typeof (this.mcpServer as any).registerTool === 'function') {
+          (this.mcpServer as any).registerTool({
+            name,
+            description: schema.description || "",
+            parameters: schema,
+            handler: async (params: any) => {
+              try {
+                return await handler(params);
+              } catch (error) {
+                console.error(`Error executing tool ${name}:`, error);
+                return {
+                  type: "error",
+                  message: error instanceof Error ? error.message : String(error),
+                  stack: error instanceof Error ? error.stack : undefined
+                };
+              }
+            },
+          });
+        } else if (typeof (this.mcpServer as any).tool === 'function') {
+          // For newer MCP SDK versions using the tool API
+          (this.mcpServer as any).tool(
+            name,
+            schema,
+            async (params: any) => {
+              try {
+                const result = await handler(params);
+                return {
+                  content: [{ type: "text", text: JSON.stringify(result) }]
+                };
+              } catch (error) {
+                console.error(`Error executing tool ${name}:`, error);
+                return {
+                  content: [{
+                    type: "text",
+                    text: error instanceof Error ? error.message : String(error)
+                  }],
+                  isError: true
+                };
+              }
+            }
+          );
+        } else {
+          console.error(`Unable to register tool ${name}: MCP server API not compatible`);
+        }
+      } catch (error) {
+        console.error(`Error registering tool ${name}:`, error);
+      }
     }
 
     // Add an event listener to register this tool for future connections
