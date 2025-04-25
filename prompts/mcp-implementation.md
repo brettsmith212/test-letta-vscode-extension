@@ -48,19 +48,19 @@
   - **Dependencies**: 1.2
 
 ## 3 – Refactor Tool Definitions for MCP
-- [ ] Step 3.1: **Centralise tool registry**
+- [x] Step 3.1: **Centralise tool registry**
   - **Task**: Add `src/mcp/toolRegistry.ts` exporting an array `{ name, schema, handler }`. Import it from the server.
   - **Description**: Keeps tool metadata in one place, eliminating duplication between MCP server and existing TypeScript utilities. Simplifies adding new tools later.
   - **Files**: `src/mcp/toolRegistry.ts`, plus small refactor touches.
   - **Dependencies**: 2.1
 
-- [ ] Step 3.2: **Port file-manipulation tools**
+- [x] Step 3.2: **Port file-manipulation tools**
   - **Task**: Register `create_file`, `update_file`, `delete_file`, `read_file`, `search_files`, and `list_files`, pointing each to the corresponding `executeTool` switch branch.
   - **Description**: Gives the assistant access to filesystem/IDE actions without the old “Python stub” indirection.
   - **Files**: `src/tools/fileTools.ts`, `src/mcp/toolRegistry.ts`
   - **Dependencies**: 3.1
 
-- [ ] Step 3.3: **Port remaining terminal tool**
+- [x] Step 3.3: **Port remaining terminal tool**
   - **Task**: Register `read_terminal_output` in the registry, hook to `readTerminalOutput`.
   - **Description**: Completes parity with the toolset we had under Python stubs, ensuring nothing is lost in the migration.
   - **Files**: `src/mcp/toolRegistry.ts`

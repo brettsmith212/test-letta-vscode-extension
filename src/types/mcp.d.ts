@@ -1,5 +1,5 @@
-declare module '@modelcontextprotocol/sdk' {
-  export class TEMP {
+declare module '@modelcontextprotocol/sdk/esm/server/mcp' {
+  export class McpServer {
     constructor(options: { sendEvent: (event: any) => void });
     receiveEvent(data: any): void;
     registerTool(options: {
