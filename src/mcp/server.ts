@@ -8,7 +8,7 @@ import * as vscode from 'vscode';
 import { toolRegistry } from './toolRegistry';
 import { writeMcpConfig } from './config';
 
-const DEFAULT_PORT = 7429; // Default MCP server port (different from Docker's 7428)
+const DEFAULT_PORT = 7428; // MCP server port that Docker container expects
 
 class McpExpressServer {
   /**
@@ -173,8 +173,10 @@ class McpExpressServer {
     return new Promise((resolve, reject) => {
       const tryPort = (port: number, maxRetries = 3, retryCount = 0) => {
         try {
-          console.log(`Attempting to start MCP server on port ${port}...`);
-          this.server = this.app.listen(port, () => {
+          // Log server start attempt with binding to all interfaces (0.0.0.0) for Docker access
+          console.log(`Attempting to start MCP server on port ${port} (binding to all interfaces)...`);
+          // Bind to all network interfaces (0.0.0.0) so Docker can connect
+          this.server = this.app.listen(port, '0.0.0.0', () => {
             this.port = port;
             console.log(`MCP server started successfully on port ${port}`);
             // Write config with the actual port we're using
@@ -195,19 +197,20 @@ class McpExpressServer {
               }
               
               // Try another port if we haven't exceeded max retries
-              if (retryCount < maxRetries) {
-                // Try a port higher by a small arbitrary offset, avoiding Docker's 7428
-                const nextPort = port + 1 + Math.floor(Math.random() * 10);
-                if (nextPort === 7428) { // Avoid Docker's port
-                  tryPort(7439, maxRetries, retryCount + 1); // Skip to higher range
-                } else {
-                  console.log(`Retrying with port ${nextPort}...`);
-                  tryPort(nextPort, maxRetries, retryCount + 1);
+              // Since Docker is expecting us to use exactly port 7428, we can't retry with another port
+              // Instead, show a specific message about port 7428 being required
+              vscode.window.showErrorMessage(
+                `Cannot start MCP server on required port 7428. This port is already in use. Please check if another instance of the extension is running or restart VS Code.`,
+                'Close Docker',
+                'Details'
+              ).then(selection => {
+                if (selection === 'Close Docker') {
+                  vscode.window.showInformationMessage('Please manually close the Letta Docker container and then try again.');
+                } else if (selection === 'Details') {
+                  vscode.commands.executeCommand('letta-ai.showErrorDetails');
                 }
-              } else {
-                vscode.window.showErrorMessage(`Cannot start MCP server: All ports are in use. Please restart VS Code to release ports or check for running processes.`);
-                reject(err);
-              }
+              });
+              reject(err);
             } else {
               console.error(`Failed to start MCP server: ${err.message}`);
               reject(err);

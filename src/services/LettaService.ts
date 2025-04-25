@@ -209,17 +209,52 @@ export class LettaService {
       // Check if our MCP server is already registered
       console.log(`[DEBUG] Checking for existing MCP servers`);
       const mcpServers = await client.tools.listMcpServers();
+      console.log(`[DEBUG] Existing MCP servers:`, Object.keys(mcpServers));
       const isVSCodeServerRegistered = Object.keys(mcpServers).includes('vscode');
 
+      // Get our actual MCP server port
+      const { getCurrentMcpPort } = require('../mcp/server');
+      const currentPort = getCurrentMcpPort() || 7428; // Fallback to our default
+
+      // Read our MCP config to see what URL we're advertising
+      const { readMcpConfig } = require('../mcp/config');
+      const mcpConfig = readMcpConfig();
+      console.log(`[DEBUG] Current MCP config:`, mcpConfig);
+
       if (!isVSCodeServerRegistered) {
-        console.log(`[DEBUG] Registering VS Code MCP server with Letta`);
+        console.log(`[DEBUG] Registering VS Code MCP server with Letta using port ${currentPort}`);
+        // Use host.docker.internal as set up in Docker run command
+        const hostIp = 'host.docker.internal';
+
+        // Use the same endpoint we wrote to the config file
         await client.tools.addMcpServer({
           serverName: 'vscode',
-          serverUrl: 'http://localhost:7428/mcp'
+          serverUrl: mcpConfig?.endpoint || `http://${hostIp}:${currentPort}/mcp`
         });
-        console.log(`[DEBUG] Successfully registered VS Code MCP server`);
+        console.log(`[DEBUG] Successfully registered VS Code MCP server with URL: ${mcpConfig?.endpoint || `http://${hostIp}:${currentPort}/mcp`}`);
       } else {
-        console.log(`[DEBUG] VS Code MCP server already registered`);
+        console.log(`[DEBUG] VS Code MCP server already registered - attempting to update with current config`);
+        try {
+          // Try to update the existing server with our new URL
+          const { getCurrentMcpPort } = require('../mcp/server');
+          const currentPort = getCurrentMcpPort() || 7428; // Default to 7428
+          const { readMcpConfig } = require('../mcp/config');
+          const mcpConfig = readMcpConfig();
+
+          if (mcpConfig?.endpoint) {
+            console.log(`[DEBUG] Updating MCP server URL to: ${mcpConfig.endpoint}`);
+            // Letta SDK doesn't have an update method, so we delete and re-add
+            await client.tools.deleteMcpServer('vscode').catch(e => console.log('Error deleting MCP server:', e));
+            await client.tools.addMcpServer({
+              serverName: 'vscode',
+              serverUrl: mcpConfig.endpoint
+            });
+            console.log(`[DEBUG] Successfully updated VS Code MCP server URL`);
+          }
+        } catch (updateError) {
+          console.error(`[DEBUG] Failed to update MCP server:`, updateError);
+          // Continue anyway, we'll try to use existing registration
+        }
       }
 
       // List all MCP tools available from our server

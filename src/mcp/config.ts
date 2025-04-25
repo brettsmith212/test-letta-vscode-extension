@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
-const MCP_PORT = 7429; // Default port, different from Docker's 7428
+const MCP_PORT = 7428; // MCP server port that Docker container expects
 const MCP_CONFIG_FILENAME = 'mcp_config.json';
 const LETTA_CONFIG_DIR = '.letta';
 
@@ -29,12 +29,17 @@ export function writeMcpConfig(port: number = MCP_PORT): void {
     const configDir = ensureLettaConfigDir();
     const configPath = path.join(configDir, MCP_CONFIG_FILENAME);
     
+    // Since Docker is run with --add-host=host.docker.internal:host-gateway, use it directly
+    // This is what the container expects since it's configured that way in start_docker.sh
+    const hostIp = 'host.docker.internal';
+    console.log(`Using host.docker.internal as configured in Docker run command`);  
+    
     const config = {
-      endpoint: `http://host.docker.internal:${port}/mcp`
+      endpoint: `http://${hostIp}:${port}/mcp`
     };
     
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-    console.log(`MCP config written to ${configPath} with port ${port}`);
+    console.log(`MCP config written to ${configPath} with endpoint: ${config.endpoint}`);
   } catch (error) {
     console.error('Failed to write MCP config:', error);
   }
