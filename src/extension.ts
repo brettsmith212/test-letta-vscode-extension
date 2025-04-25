@@ -3,6 +3,7 @@ import { ChatPanel } from './panels/ChatPanel';
 import { LettaService } from './services/LettaService';
 import { getOrCreateMcpServer } from './mcp/server';
 import { writeMcpConfig } from './mcp/config';
+import { indexWorkspace } from './commands/indexWorkspace';
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Letta AI extension is now active!');
@@ -24,8 +25,13 @@ export async function activate(context: vscode.ExtensionContext) {
             const panel = ChatPanel.getInstance(context.extensionUri, context);
             panel.reveal();
         });
+        
+        const indexWorkspaceCommand = vscode.commands.registerCommand(
+            'letta-ai.indexWorkspace', 
+            () => indexWorkspace()
+        );
 
-        context.subscriptions.push(openChatCommand);
+        context.subscriptions.push(openChatCommand, indexWorkspaceCommand);
     } catch (error) {
         console.error('Failed to activate Letta AI extension:', error);
         vscode.window.showErrorMessage('Failed to initialize Letta AI extension. Please check if Docker is installed and running.');

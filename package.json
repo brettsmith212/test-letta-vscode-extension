@@ -18,6 +18,10 @@
       {
         "command": "letta-ai.openChat",
         "title": "Open Letta Chat"
+      },
+      {
+        "command": "letta-ai.indexWorkspace",
+        "title": "Letta AI: Index Workspace for Memory"
       }
     ],
     "configuration": {
