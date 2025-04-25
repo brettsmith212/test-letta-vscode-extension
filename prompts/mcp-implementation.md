@@ -17,20 +17,20 @@
   - **Step Dependencies**: 0.1
 
 ## 1 – Scaffold MCP Server
-- [ ] Step 1.1: **Create `src/mcp/server.ts`**
+- [x] Step 1.1: **Create `src/mcp/server.ts`**
   - **Task**: Stand-up an Express server with `/mcp` SSE endpoint, heartbeat, and graceful shutdown hooks.
   - **Description**: This is the single entry-point Letta will dial via SSE. Establishing it early lets us test tool registration incrementally.
   - **Files**: `src/mcp/server.ts`
   - **Dependencies**: 0.x
 
-- [ ] Step 1.2: **Bootstrap server from extension**
+- [x] Step 1.2: **Bootstrap server from extension**
   - **Task**: In `extension.ts`, start the MCP server during `activate` and dispose it during `deactivate`.
   - **Description**: Wiring the server into VS Code’s lifecycle guarantees tools are available whenever the extension is active, and resources are freed when it unloads.
   - **Files**: `src/extension.ts`
   - **Dependencies**: 1.1
 
 ## 2 – Expose First Tool (Proof of Concept)
-- [ ] Step 2.1: **Register `execute_command`**
+- [x] Step 2.1: **Register `execute_command`**
   - **Task**: Import the JSON schema from `terminalTools`, add a resolver that delegates to `executeTerminalTool`, and surface the existing user-approval flow.
   - **Description**: Validates the full round-trip: Letta calls a tool → MCP server routes it → VS Code executes it → response returns. Proving this path before porting all tools de-risks later steps.
   - **Files**
@@ -39,7 +39,7 @@
     - `src/panels/ChatPanel.ts` (tiny tweak for approval flow)
   - **Dependencies**: 1.1
 
-- [ ] Step 2.2: **Create MCP config helper**
+- [x] Step 2.2: **Create MCP config helper**
   - **Task**: Auto-write `~/.letta/mcp_config.json` with the local SSE URL if it’s missing.
   - **Description**: New users shouldn’t hand-edit config files; this step guarantees Letta can discover the VS Code tool server on first run.
   - **Files**:

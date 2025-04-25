@@ -4,16 +4,31 @@
     "target": "es2020",
     "outDir": "out",
     "rootDir": "src",
+    "allowJs": true, // ← lets TS resolve .js files
     "sourceMap": true,
     "strict": true,
     "esModuleInterop": true,
-    "lib": ["es2020", "DOM", "DOM.Iterable"],
-    "types": ["node", "vscode"],
+    "lib": [
+      "es2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node",
+      "vscode"
+    ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     }
   },
-  "include": ["src/**/*", "src/types/**/*.d.ts"],
-  "exclude": ["node_modules", "vite.config.ts"]
+  "include": [
+    "src/**/*",
+    "src/types/**/*.d.ts"
+  ],
+  "exclude": [
+    "vite.config.ts"
+  ] // ← removed "node_modules" here
 }

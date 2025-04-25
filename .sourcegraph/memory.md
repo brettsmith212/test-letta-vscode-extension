@@ -12,7 +12,8 @@ This project is a VS Code extension that integrates with the Letta agent framewo
 - `npm run start:letta` - Start the Letta container
 
 ## Progress Tracking
-When you complete a step be sure to mark it completed in implementation.md as well.
+- When you complete a step be sure to mark it completed in implementation.md as well.
+- Do not do more than one step without having the Developer review your work. We don't want to get ahead of ourselves too quickly.
 
 ## Helpful Notes
 - Always import letta sdk as `@letta-ai/letta-client`
