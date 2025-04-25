@@ -5,6 +5,7 @@ import { getOrCreateMcpServer } from './mcp/server';
 import { writeMcpConfig } from './mcp/config';
 import { indexWorkspace } from './commands/indexWorkspace';
 import { clearProjectMemory, clearPersonaMemory } from './commands/flushMemory';
+import { reconnectLetta } from './utils/dockerHelper';
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Letta AI extension is now active!');
@@ -17,6 +18,9 @@ export async function activate(context: vscode.ExtensionContext) {
         
         // Write MCP config file for Letta to discover our tools
         writeMcpConfig();
+        
+        // Ensure connection to Letta server on startup
+        await reconnectLetta();
         
         // Initialize the Letta service before registering commands
         const lettaService = LettaService.getInstance();
@@ -41,12 +45,18 @@ export async function activate(context: vscode.ExtensionContext) {
             'letta-ai.clearPersonaMemory',
             () => clearPersonaMemory()
         );
+        
+        const reconnectCommand = vscode.commands.registerCommand(
+            'letta-ai.reconnect',
+            () => reconnectLetta()
+        );
 
         context.subscriptions.push(
             openChatCommand, 
             indexWorkspaceCommand,
             clearProjectMemoryCommand,
-            clearPersonaMemoryCommand
+            clearPersonaMemoryCommand,
+            reconnectCommand
         );
     } catch (error) {
         console.error('Failed to activate Letta AI extension:', error);

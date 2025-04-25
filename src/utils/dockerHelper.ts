@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { writeMcpConfig } from '../mcp/config';
+import { getOrCreateMcpServer } from '../mcp/server';
 
 const LETTA_PORT = 8283;
 
@@ -60,6 +62,40 @@ export async function checkLettaHealth(): Promise<boolean> {
     return healthy;
   } catch (error: any) {
     console.error('Letta health check failed:', error);
+    return false;
+  }
+}
+
+/**
+ * Reconnects to the Letta server:
+ * 1. Re-checks health
+ * 2. Re-writes MCP config
+ * 3. Re-attaches tools
+ */
+export async function reconnectLetta(): Promise<boolean> {
+  try {
+    // Check if Letta is healthy
+    const isHealthy = await checkLettaHealth();
+    if (!isHealthy) {
+      vscode.window.showErrorMessage('Letta server is not responding. Check if it is running correctly.');
+      return false;
+    }
+    
+    // Re-write MCP config to ensure Letta can find our tools
+    writeMcpConfig();
+    
+    // Get MCP server instance (doesn't create a new one if already exists)
+    const mcpServer = getOrCreateMcpServer();
+    
+    // Restart the MCP server to re-register tools
+    await mcpServer.stop();
+    await mcpServer.start();
+    
+    vscode.window.showInformationMessage('Successfully reconnected to Letta server');
+    return true;
+  } catch (error: any) {
+    console.error('Failed to reconnect to Letta server:', error);
+    vscode.window.showErrorMessage(`Failed to reconnect to Letta: ${error.message || 'Unknown error'}`);
     return false;
   }
 }

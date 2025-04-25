@@ -30,6 +30,10 @@
       {
         "command": "letta-ai.clearPersonaMemory",
         "title": "Letta AI: Clear Persona Memory"
+      },
+      {
+        "command": "letta-ai.reconnect",
+        "title": "Letta AI: Reconnect to Server"
       }
     ],
     "configuration": {
