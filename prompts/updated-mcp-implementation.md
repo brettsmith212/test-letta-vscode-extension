@@ -7,7 +7,7 @@
     - `src/mcp/config.ts`
   - **User Instructions**: Re-start the container with `-p 7428:7428`; verify `curl http://host.docker.internal:7428/health` from inside the container.
 
-- [ ] Step 1.2: Health-reconnect command
+- [x] Step 1.2: Health-reconnect command
   - **Task**: Add VS Code command `letta-ai.reconnect` that re-checks `/health`, re-writes MCP config, and re-attaches tools.
   - **Files**:  
     - `src/utils/dockerHelper.ts` (new `reconnectLetta()` helper)  
