@@ -67,6 +67,10 @@ export async function checkLettaHealth(): Promise<boolean> {
     if (healthy) {
       // If healthy, show a status message
       vscode.window.setStatusBarMessage('Letta: Connected', 5000);
+      
+      // Write MCP config with current port setting
+      const mcpPort = config.get<number>('mcpPort') || 7428;
+      writeMcpConfig(mcpPort);
     } else {
       vscode.window.setStatusBarMessage('Letta: Connection failed', 5000);
     }

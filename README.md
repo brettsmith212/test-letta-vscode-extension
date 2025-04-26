@@ -1,75 +1,83 @@
-# Claude Chat VSCode Extension
+# Letta AI VS Code Extension
 
-A VSCode extension that provides an AI Coding Agent powered by Claude 3.5 Sonnet, enabling intelligent code assistance and chat interactions directly within your editor.
+A VS Code extension for interacting with Letta AI, a powerful assistant for developers.
 
 ## Features
 
-- Interactive chat interface with Claude AI
-- Code generation, analysis, and refactoring assistance
-- Context-aware responses based on your workspace
-- Modern, minimalist dark theme UI using Shadcn components
-- Built with React TypeScript for the webview interface
+- Chat with Letta AI directly within VS Code
+- Use AI-powered tools to analyze and modify your code
+- Context-aware assistance based on your open files
+- Workspace indexing for more relevant responses
 
-## Prerequisites
+## Requirements
 
-- Node.js and npm installed
-- VSCode version 1.60.0 or higher
-- Anthropic API key
+- Docker Desktop (for running the Letta server)
+- Node.js 18+ and npm
 
 ## Installation
 
-1. Clone the repository:
-```bash
-git clone https://github.com/brettsmith212/test-ai-vscode-extension.git
-cd test-ai-vscode-extension
-```
+1. Install the extension from the VS Code marketplace
+2. Run the Letta server container using Docker
 
-2. Install dependencies:
-```bash
-npm install
-```
+## Setting up the Docker Container
 
-## Development Setup
+### Automatic Setup
 
-1. Configure launch.json for debugging:
-   - Open the project in VSCode
-   - Press F5 to start debugging
-   - This will open a new VSCode window with the extension loaded
+The extension can automatically start the Docker container for you:
 
-2. Run Storybook for UI development:
-```bash
-npm run storybook
-```
-This will start Storybook on http://localhost:6006
+1. Open the Command Palette (Ctrl+Shift+P or Cmd+Shift+P)
+2. Run `Letta AI: Reconnect to Server`
 
-## Project Structure
+### Manual Setup
 
-- `src/`: Main extension code
-  - Extension logic
-  - Claude LLM integration
-  - Agent tools and utilities
-  - Test files for functionality verification
+If you prefer to set up Docker manually:
 
-- `webviews/`: Chat interface code
-  - React TypeScript components
-  - Shadcn UI components in `components/ui/`
-  - Storybook configuration and stories
+1. Run the container using the included script:
+   ```bash
+   npm run start:letta
+   ```
 
-## Following extension guidelines
+2. Or run the Docker command directly:
+   ```bash
+   docker run --rm \
+     -p 8283:8283 \
+     --add-host=host.docker.internal:host-gateway \
+     -v "$HOME/.letta:/root/.letta" \
+     lettaai/letta-server:latest
+   ```
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+## Configuration
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+This extension contributes the following settings:
 
-## Working with Markdown
+* `lettaChat.serverUrl`: URL of the Letta server (default: http://localhost:8283)
+* `lettaChat.mcpPort`: Port for the MCP server that the Letta Docker container connects to (default: 7428)
+* `lettaChat.model`: Model to use for chat completion (default: letta/letta-free)
+* `lettaChat.embeddingModel`: Model to use for text embeddings (default: letta/letta-free)
+* `lettaChat.agentScope`: Scope for the Letta agent memory (workspace, global, or folder-specific)
+* `lettaChat.enableFileIndexing`: Automatically index workspace files for agent memory
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+## Troubleshooting
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+### MCP Configuration
 
-## For more information
+Letta uses the Model Context Protocol (MCP) to provide tools for accessing your files and running commands. The extension automatically creates a configuration file at `~/.letta/mcp_config.json`. 
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+If you encounter issues with tool execution:
+
+1. Delete the existing MCP config file: `rm ~/.letta/mcp_config.json`
+2. Restart the extension or reload your VS Code window
+3. The extension will recreate the file with the correct format
+
+### Docker Connection
+
+If the extension cannot connect to the Docker container:
+
+1. Ensure Docker Desktop is running
+2. Check that port 8283 is not in use by another application
+3. Verify the container is running: `docker ps | grep letta`
+4. Check container logs: `docker logs $(docker ps -q --filter ancestor=lettaai/letta-server:latest)`
+
+## License
+
+This extension is licensed under the MIT License.

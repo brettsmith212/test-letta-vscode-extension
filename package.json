@@ -44,6 +44,11 @@
           "default": "http://localhost:8283",
           "description": "URL of the Letta server"
         },
+        "lettaChat.mcpPort": {
+          "type": "number",
+          "default": 7428,
+          "description": "Port for the MCP server that the Letta Docker container connects to"
+        },
         "lettaChat.model": {
           "type": "string",
           "default": "letta/letta-free",
@@ -79,6 +84,9 @@
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src webviews",
     "test": "vscode-test",
+    "test:unit": "vitest run",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage",
     "build:webviews": "vite build",
     "watch:webviews": "vite",
     "storybook": "storybook dev -p 6006",
@@ -104,12 +112,14 @@
     "@vitejs/plugin-react": "^4.0.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
+    "@vitest/coverage-istanbul": "^1.1.0",
     "autoprefixer": "^10.4.0",
     "eslint": "^9.23.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.8.2",
-    "vite": "^6.3.2"
+    "vite": "^6.3.2",
+    "vitest": "^1.1.0"
   },
   "dependencies": {
     "@letta-ai/letta-client": "^0.1.102",
