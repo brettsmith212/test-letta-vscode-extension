@@ -54,16 +54,51 @@ export async function checkLettaHealth(): Promise<boolean> {
     const config = vscode.workspace.getConfiguration('lettaChat');
     const serverUrl = config.get<string>('serverUrl') || `http://localhost:${LETTA_PORT}`;
     
-    // Try a generic connection test to the root endpoint since /health returned 404
-    console.log(`Checking Letta connection at ${serverUrl}...`);
-    const response = await fetch(serverUrl, {
-      // Add timeout to avoid hanging if server is unreachable
-      signal: AbortSignal.timeout(5000)
-    });
+    // Try both /health and / endpoints in order
+    const tryPaths = ['/health', '/'];
+    let healthy = false;
+    let statusCode = 0;
     
-    // Any response (even redirect) is considered healthy as long as the server responds
-    const healthy = response.status < 500; // Accept any non-server error as "healthy"
-    console.log(`Letta connection test result: ${healthy} (status: ${response.status})`);
+    // Use the timeout only for the entire process, not per request
+    const timeout = 5000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+      for (const path of tryPaths) {
+        const fullUrl = `${serverUrl}${path}`;
+        console.log(`Trying health check at ${fullUrl}...`);
+        
+        try {
+          const response = await fetch(fullUrl, {
+            signal: controller.signal
+          });
+          
+          statusCode = response.status;
+          // Consider any non-server error as "healthy"
+          if (response.status < 500) {
+            healthy = true;
+            console.log(`Health check successful at ${fullUrl} with status ${statusCode}`);
+            break;
+          } else {
+            console.log(`Endpoint ${fullUrl} returned server error ${statusCode}, trying next path`);
+          }
+        } catch (error) {
+          const fetchError = error as Error;
+          // If this specific endpoint failed but not due to timeout, try the next one
+          if (!controller.signal.aborted) {
+            console.log(`Endpoint ${fullUrl} failed: ${fetchError.message}, trying next path`);
+          } else {
+            throw fetchError; // Re-throw if aborted
+          }
+        }
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    
+    console.log(`Final Letta health check result: ${healthy} (status: ${statusCode})`);
+    
     if (healthy) {
       // If healthy, show a status message
       vscode.window.setStatusBarMessage('Letta: Connected', 5000);
@@ -74,9 +109,10 @@ export async function checkLettaHealth(): Promise<boolean> {
     } else {
       vscode.window.setStatusBarMessage('Letta: Connection failed', 5000);
     }
+    
     return healthy;
   } catch (error: any) {
-    console.error('Letta connection test failed:', error);
+    console.error('Letta health check failed:', error);
     vscode.window.setStatusBarMessage('Letta: Connection error', 5000);
     return false;
   }
