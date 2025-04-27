@@ -301,12 +301,29 @@ export class LettaService {
         }
 
         try {
+          // Check if tool ID is already in the cache
+          const cachedToolId = this.toolsCache.get(toolName);
+          
+          if (cachedToolId) {
+            console.log(`[DEBUG] Using cached tool ID for ${toolName}: ${cachedToolId}`);
+            // Use cached ID to attach directly without making additional API calls
+            await client.agents.tools.attach(agentId, cachedToolId);
+            console.log(`[DEBUG] Successfully attached cached MCP tool ${toolName} to agent ${agentId}`);
+            continue;
+          }
+          
+          // Tool not in cache, need to create it
           console.log(`[DEBUG] Adding MCP tool ${toolName} to agent ${agentId}`);
           await client.tools.addMcpTool('vscode', toolName);
           const toolFromLetta = await client.tools.listMcpToolsByServer('vscode')
             .then(tools => tools.find(t => t.name === toolName));
 
           if (toolFromLetta && toolFromLetta.id) {
+            // Cache the tool ID for future use
+            this.toolsCache.set(toolName, toolFromLetta.id);
+            await this.saveToolsCache();
+            
+            // Attach the tool
             await client.agents.tools.attach(agentId, toolFromLetta.id);
             console.log(`[DEBUG] Successfully attached MCP tool ${toolName} to agent ${agentId}`);
           } else {

@@ -87,7 +87,7 @@
     - `test/attachTools.test.ts` (new): mock SDK client and verify calls.  
   - **Step Dependencies**: Step 2.
 
-- [ ] **Step 8: Cache tool IDs to skip redundant `attach` calls**  
+- [x] **Step 8: Cache tool IDs to skip redundant `attach` calls**  
   - **Task**: Use `this.toolsCache` before making network calls.  
   - **Description**: Speeds up startup & avoids “tool already attached” errors.  
   - **Files (2)**  
