@@ -54,7 +54,7 @@
   - **User Instructions**: none.
 
 ## Tool Safety & Validation
-- [ ] **Step 5: Zod validation before tool execution**  
+- [x] **Step 5: Zod validation before tool execution**  
   - **Task**: Call `schema.parse` for each incoming `input` in `executeTool` and `executeTerminalTool`.  
   - **Description**: Ensures bad inputs are rejected quickly.  
   - **Files (4)**  

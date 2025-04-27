@@ -182,15 +182,25 @@ export async function readTerminalOutput(maxLines?: number): Promise<string> {
 export async function executeTerminalTool(toolName: string, input: any): Promise<string> {
   console.log(`executeTerminalTool: Tool: ${toolName}, Input:`, input);
 
-  if (toolName === "run_command") {
-    return await executeTerminalCommand(
-      input.command,
-      input.cwd,
-      input.captureOutput === true
-    );
-  } else if (toolName === "read_terminal_output") {
-    return await readTerminalOutput(input.maxLines);
-  } else {
-    throw new Error(`Unknown terminal tool: ${toolName}`);
+  try {
+    if (toolName === "run_command") {
+      // Validate input against schema
+      const params = runCommandSchema.parse(input);
+      return await executeTerminalCommand(
+        params.command,
+        params.cwd,
+        params.captureOutput === true
+      );
+    } else if (toolName === "read_terminal_output") {
+      // Validate input against schema
+      const params = readTerminalOutputSchema.parse(input);
+      return await readTerminalOutput(params.maxLines);
+    } else {
+      throw new Error(`Unknown terminal tool: ${toolName}`);
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`executeTerminalTool: Error in ${toolName}: ${errorMessage}`);
+    throw new Error(`Error executing terminal tool ${toolName}: ${errorMessage}`);
   }
 }

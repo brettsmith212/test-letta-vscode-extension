@@ -163,19 +163,29 @@ export async function executeTool(toolName: string, input: any, showContents: bo
   console.log(`executeTool: Workspace root: ${rootPath}, Tool: ${toolName}, Input:`, input);
 
   // Check workspace exclusions
-  const settings = vscode.workspace.getConfiguration('files', workspaceFolders[0].uri);
-  const excludePatterns = settings.get<Record<string, boolean>>('exclude', {});
+  let excludePatterns = {};
+  try {
+    const settings = vscode.workspace.getConfiguration('files', workspaceFolders[0].uri);
+    if (settings && typeof settings.get === 'function') {
+      excludePatterns = settings.get<Record<string, boolean>>('exclude', {});
+    }
+  } catch (error) {
+    console.warn('Failed to get workspace exclusions:', error);
+  }
   console.log(`executeTool: Files.exclude patterns:`, excludePatterns);
 
   try {
     console.log(`Executing tool: ${toolName} with input:`, input);
+    
     switch (toolName) {
-      case "create_file":
-      case "update_file":
-        if (path.isAbsolute(input.path)) {
+      case "create_file": {
+        // Validate input against schema
+        const params = createFileSchema.parse(input);
+        
+        if (path.isAbsolute(params.path)) {
           throw new Error("Absolute paths are not allowed. Please provide a relative path to the workspace root.");
         }
-        const filePath = path.join(rootPath, input.path);
+        const filePath = path.join(rootPath, params.path);
         const relativePath = path.relative(rootPath, filePath);
         if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
           throw new Error("Path is outside the workspace");
@@ -183,15 +193,39 @@ export async function executeTool(toolName: string, input: any, showContents: bo
         const uri = vscode.Uri.file(filePath);
         console.log(`executeTool: ${toolName} at ${uri.fsPath}`);
         const encoder = new TextEncoder();
-        await vscode.workspace.fs.writeFile(uri, encoder.encode(input.content));
-        const result = `File ${input.path} has been ${toolName === "create_file" ? "created or updated" : "updated"}.`;
+        await vscode.workspace.fs.writeFile(uri, encoder.encode(params.content));
+        const result = `File ${params.path} has been created or updated.`;
         console.log(`Tool ${toolName} executed successfully:`, result);
         return result;
-      case "delete_file":
-        if (path.isAbsolute(input.path)) {
+      }
+      case "update_file": {
+        // Validate input against schema
+        const params = updateFileSchema.parse(input);
+        
+        if (path.isAbsolute(params.path)) {
           throw new Error("Absolute paths are not allowed. Please provide a relative path to the workspace root.");
         }
-        const deletePath = path.join(rootPath, input.path);
+        const filePath = path.join(rootPath, params.path);
+        const relativePath = path.relative(rootPath, filePath);
+        if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+          throw new Error("Path is outside the workspace");
+        }
+        const uri = vscode.Uri.file(filePath);
+        console.log(`executeTool: ${toolName} at ${uri.fsPath}`);
+        const encoder = new TextEncoder();
+        await vscode.workspace.fs.writeFile(uri, encoder.encode(params.content));
+        const result = `File ${params.path} has been updated.`;
+        console.log(`Tool ${toolName} executed successfully:`, result);
+        return result;
+      }
+      case "delete_file": {
+        // Validate input against schema
+        const params = deleteFileSchema.parse(input);
+        
+        if (path.isAbsolute(params.path)) {
+          throw new Error("Absolute paths are not allowed. Please provide a relative path to the workspace root.");
+        }
+        const deletePath = path.join(rootPath, params.path);
         const deleteRelative = path.relative(rootPath, deletePath);
         if (deleteRelative.startsWith('..') || path.isAbsolute(deleteRelative)) {
           throw new Error("Path is outside the workspace");
@@ -199,25 +233,29 @@ export async function executeTool(toolName: string, input: any, showContents: bo
         const deleteUri = vscode.Uri.file(deletePath);
         console.log(`executeTool: delete_file at ${deleteUri.fsPath}`);
         await vscode.workspace.fs.delete(deleteUri);
-        const deleteResult = `File ${input.path} has been deleted.`;
+        const deleteResult = `File ${params.path} has been deleted.`;
         console.log(`Tool delete_file executed successfully:`, deleteResult);
         return deleteResult;
-      case "read_file":
-        if (path.isAbsolute(input.path)) {
+      }
+      case "read_file": {
+        // Validate input against schema
+        const params = readFileSchema.parse(input);
+        
+        if (path.isAbsolute(params.path)) {
           throw new Error("Absolute paths are not allowed. Please provide a relative path to the workspace root.");
         }
-        console.log(`read_file: Attempting to find file: ${input.path}`);
+        console.log(`read_file: Attempting to find file: ${params.path}`);
         let readUri: vscode.Uri;
         // Try exact path first
         try {
-          readUri = vscode.Uri.file(path.join(rootPath, input.path));
+          readUri = vscode.Uri.file(path.join(rootPath, params.path));
           console.log(`read_file: Checking exact path: ${readUri.fsPath}`);
           await fs.access(readUri.fsPath, fs.constants.R_OK);
           console.log(`read_file: Exact path is readable: ${readUri.fsPath}`);
         } catch (exactPathError) {
-          console.log(`read_file: Exact path ${input.path} not accessible:`, exactPathError);
+          console.log(`read_file: Exact path ${params.path} not accessible:`, exactPathError);
           // Try findFiles
-          const fileName = path.basename(input.path);
+          const fileName = path.basename(params.path);
           const patterns = [
             `**/${fileName}`,
             fileName,
@@ -239,8 +277,8 @@ export async function executeTool(toolName: string, input: any, showContents: bo
             console.log(`read_file: No matches with findFiles, trying recursive FS search`);
             const foundPath = await findFileRecursively(rootPath, fileName);
             if (!foundPath) {
-              console.error(`read_file: No files found for ${input.path}`);
-              throw new Error(`File ${input.path} not found in workspace. Try 'list files' to see all files or 'search files ${fileName}' to locate it. Check if the file is excluded in settings (files.exclude) or if the workspace needs to be re-opened.`);
+              console.error(`read_file: No files found for ${params.path}`);
+              throw new Error(`File ${params.path} not found in workspace. Try 'list files' to see all files or 'search files ${fileName}' to locate it. Check if the file is excluded in settings (files.exclude) or if the workspace needs to be re-opened.`);
             }
             readUri = vscode.Uri.file(foundPath);
             console.log(`read_file: FS search found: ${readUri.fsPath}`);
@@ -259,7 +297,7 @@ export async function executeTool(toolName: string, input: any, showContents: bo
             console.log(`read_file: Selected file is readable: ${readUri.fsPath}`);
           } catch (accessError) {
             console.error(`read_file: Cannot read selected file ${readUri.fsPath}:`, accessError);
-            throw new Error(`Found ${input.path} at ${path.relative(rootPath, readUri.fsPath)}, but cannot read it due to permissions or system issues. Try checking file permissions or running VS Code with elevated privileges.`);
+            throw new Error(`Found ${params.path} at ${path.relative(rootPath, readUri.fsPath)}, but cannot read it due to permissions or system issues. Try checking file permissions or running VS Code with elevated privileges.`);
           }
         }
 
@@ -291,11 +329,15 @@ export async function executeTool(toolName: string, input: any, showContents: bo
             return readResult;
           } catch (nodeError) {
             console.error(`read_file: Node.js fs.readFile failed:`, nodeError);
-            throw new Error(`Found ${input.path} at ${path.relative(rootPath, readUri.fsPath)}, but cannot read it: ${nodeError instanceof Error ? nodeError.message : String(nodeError)}. Try checking file permissions or running VS Code with elevated privileges.`);
+            throw new Error(`Found ${params.path} at ${path.relative(rootPath, readUri.fsPath)}, but cannot read it: ${nodeError instanceof Error ? nodeError.message : String(nodeError)}. Try checking file permissions or running VS Code with elevated privileges.`);
           }
         }
-      case "search_files":
-        const pattern = `**/*${input.query}*`;
+      }
+      case "search_files": {
+        // Validate input against schema
+        const params = searchFilesSchema.parse(input);
+        
+        const pattern = `**/*${params.query}*`;
         console.log(`search_files: Searching with pattern: ${pattern}`);
         const uris = await vscode.workspace.findFiles(pattern, '**/node_modules/**', 100);
         const files = uris.map(uri => {
@@ -307,8 +349,12 @@ export async function executeTool(toolName: string, input: any, showContents: bo
         const searchResult = files.join('\n');
         console.log(`Tool search_files executed successfully:`, searchResult);
         return searchResult;
-      case "list_files":
-        const maxResults = input.maxResults || 100;
+      }
+      case "list_files": {
+        // Validate input against schema
+        const params = listFilesSchema.parse(input);
+        
+        const maxResults = params.maxResults || 100;
         console.log(`list_files: Listing up to ${maxResults} files`);
         const listUris = await vscode.workspace.findFiles('**/*', '**/node_modules/**', maxResults);
         const listFiles: string[] = [];
@@ -331,6 +377,7 @@ export async function executeTool(toolName: string, input: any, showContents: bo
           : `${diagnostics.join('\n')}\n\nNo files found in workspace.`;
         console.log(`Tool list_files executed successfully:`, listResult);
         return listResult;
+      }
       default:
         throw new Error(`Unknown tool: ${toolName}`);
     }
