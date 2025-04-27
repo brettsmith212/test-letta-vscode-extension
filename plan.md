@@ -108,7 +108,7 @@
   - **Step Dependencies**: Step 2.  
   - **User Instructions**: Run `npm run watch:webviews` during dev for live reload.
 
-- [ ] **Step 10: Log viewer panel**  
+- [x] **Step 10: Log viewer panel**  
   - **Task**: Add a new command `letta-ai.openLogs` that shows extension logs in a readonly editor.  
   - **Description**: Aids debugging without opening console.  
   - **Files (3)**  

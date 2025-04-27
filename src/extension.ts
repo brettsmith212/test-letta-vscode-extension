@@ -152,13 +152,25 @@ export async function activate(context: vscode.ExtensionContext) {
             'letta-ai.reconnect',
             () => reconnectLetta()
         );
+        
+        // Register log viewer command
+        const openLogsCommand = vscode.commands.registerCommand(
+            'letta-ai.openLogs',
+            () => {
+                // Import LogPanel here to avoid circular dependencies
+                const { LogPanel } = require('./panels/LogPanel');
+                const logPanel = LogPanel.getInstance(context);
+                logPanel.reveal();
+            }
+        );
 
         context.subscriptions.push(
             openChatCommand, 
             indexWorkspaceCommand,
             clearProjectMemoryCommand,
             clearPersonaMemoryCommand,
-            reconnectCommand
+            reconnectCommand,
+            openLogsCommand
         );
     } catch (error) {
         console.error('Failed to activate Letta AI extension:', error);

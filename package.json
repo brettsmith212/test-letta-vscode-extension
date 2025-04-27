@@ -34,6 +34,10 @@
       {
         "command": "letta-ai.reconnect",
         "title": "Letta AI: Reconnect to Server"
+      },
+      {
+        "command": "letta-ai.openLogs",
+        "title": "Letta AI: Open Extension Logs"
       }
     ],
     "configuration": {
