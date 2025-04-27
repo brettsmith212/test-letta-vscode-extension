@@ -13,6 +13,12 @@
     "onStartupFinished"
   ],
   "main": "./out/extension.js",
+  "files": [
+    "out/",
+    "media/",
+    "package.json",
+    "README.md"
+  ],
   "contributes": {
     "commands": [
       {
