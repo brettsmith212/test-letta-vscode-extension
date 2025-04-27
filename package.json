@@ -91,6 +91,7 @@
     "test:unit": "vitest run",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
+    "test:ci": "vitest run --coverage --reporter=json --reporter=junit --outputFile=./test-results.json",
     "build:webviews": "vite build",
     "watch:webviews": "vite",
     "storybook": "storybook dev -p 6006",

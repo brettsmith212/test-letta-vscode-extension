@@ -1,5 +1,7 @@
 # Letta AI VS Code Extension
 
+![CI Status](https://github.com/yourusername/letta-vscode-extension/actions/workflows/ci.yml/badge.svg)
+
 A VS Code extension for interacting with Letta AI, a powerful assistant for developers.
 
 ## Features
@@ -77,6 +79,41 @@ If the extension cannot connect to the Docker container:
 2. Check that port 8283 is not in use by another application
 3. Verify the container is running: `docker ps | grep letta`
 4. Check container logs: `docker logs $(docker ps -q --filter ancestor=lettaai/letta-server:latest)`
+
+## Development
+
+### Setup
+
+```bash
+# Install dependencies
+npm install
+
+# Compile TypeScript
+npm run compile
+
+# Build webviews
+npm run build:webviews
+```
+
+### Running Tests
+
+```bash
+# Run unit tests
+npm run test:unit
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests in watch mode during development
+npm run test:watch
+```
+
+### Development Workflow
+
+1. Run `npm run watch` in one terminal to watch for TypeScript changes
+2. Run `npm run watch:webviews` in another terminal to watch for webview changes
+3. Open the extension in VS Code's Extension Development Host
+4. Use `F5` to launch the extension in debug mode
 
 ## License
 

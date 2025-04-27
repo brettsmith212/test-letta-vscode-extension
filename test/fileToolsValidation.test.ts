@@ -2,34 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { executeTool, createFileSchema, updateFileSchema, deleteFileSchema, readFileSchema, searchFilesSchema, listFilesSchema } from '../src/tools/fileTools';
 import * as vscode from 'vscode';
 
-// Mock vscode
-// Mock vscode workspace and configuration
-vi.mock('vscode', () => {
-  const mockUris = [{ fsPath: '/test/workspace/test.txt' }];
-  
-  return {
-    workspace: {
-      workspaceFolders: [{ uri: { fsPath: '/test/workspace' } }],
-      fs: {
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        readFile: vi.fn().mockResolvedValue(new Uint8Array([116, 101, 115, 116])), // 'test' in bytes
-        delete: vi.fn().mockResolvedValue(undefined),
-        stat: vi.fn().mockResolvedValue({ type: 1 }) // FileType.File
-      },
-      getConfiguration: vi.fn().mockImplementation(() => ({
-        get: vi.fn().mockReturnValue({})
-      })),
-      findFiles: vi.fn().mockImplementation(() => Promise.resolve(mockUris))
-    },
-    window: {
-      showWarningMessage: vi.fn().mockResolvedValue('Yes'),
-      showInformationMessage: vi.fn()
-    },
-    Uri: { file: (path: string) => ({ fsPath: path }) }
-  };
-});
+// We're not mocking vscode here as it's already mocked in setup.ts
+// Just use the vscode object that's already mocked
 
-// Mock fs/promises
+// Mock fs/promises for native filesystem operations
 vi.mock('fs/promises', async () => {
   return {
     access: vi.fn().mockResolvedValue(undefined),
@@ -68,12 +44,22 @@ describe('file tools validation', () => {
         content: 'test content'
       })).rejects.toThrow();
 
-      // This should pass validation
-      const mockWrite = vi.spyOn(vscode.workspace.fs, 'writeFile');
+      // Mock window.showWarningMessage to return 'Yes' for the confirmation
+      vi.spyOn(vscode.window, 'showWarningMessage').mockResolvedValueOnce('Yes');
+      
+      // Mock the VS Code fs.stat to return a non-existing file type
+      vi.spyOn(vscode.workspace.fs, 'stat').mockRejectedValueOnce(new Error('File not found'));
+      
+      // Mock the fs.writeFile function
+      const mockWrite = vi.spyOn(vscode.workspace.fs, 'writeFile').mockResolvedValueOnce(undefined);
+      
+      // This should pass validation and call writeFile
       await executeTool('create_file', {
         path: 'test.txt',
         content: 'test content'
       });
+      
+      // Verify writeFile was called
       expect(mockWrite).toHaveBeenCalled();
     });
   });

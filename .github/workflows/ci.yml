@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+    - uses: actions/checkout@v4
+      
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Compile TypeScript
+      run: npm run compile
+      
+    - name: Run linter
+      run: npm run lint
+      
+    - name: Run tests
+      run: npm run test:unit
+      
+    - name: Build webviews
+      run: npm run build:webviews
+      
+    - name: Upload test coverage
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-coverage
+        path: coverage/
+        retention-days: 30

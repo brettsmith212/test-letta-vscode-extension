@@ -118,7 +118,7 @@
   - **Step Dependencies**: Step 9.
 
 ## Testing & CI
-- [ ] **Step 11: Vitest baseline & GitHub Actions workflow**  
+- [x] **Step 11: Vitest baseline & GitHub Actions workflow**  
   - **Task**: Add `vitest.config.ts`, update `package.json` scripts, and create `.github/workflows/ci.yml`.  
   - **Description**: Automates unit tests on PRs.  
   - **Files (5)**  

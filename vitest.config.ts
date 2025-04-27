@@ -6,5 +6,18 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/out/**'],
     environment: 'node',
     globals: true,
+    setupFiles: ['./test/setup.ts'],
+    coverage: {
+      provider: 'istanbul',
+      reporter: ['text', 'json', 'html'],
+      reportsDirectory: './coverage',
+      exclude: [
+        '**/node_modules/**',
+        '**/out/**',
+        '**/test/**',
+        '**/*.d.ts',
+        'webviews/**',
+      ],
+    },
   },
 });
