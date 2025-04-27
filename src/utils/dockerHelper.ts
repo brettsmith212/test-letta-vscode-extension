@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { writeMcpConfig } from '../mcp/config';
-import { getOrCreateMcpServer } from '../mcp/server';
+import { getOrCreateMcpServer, getCurrentMcpPort } from '../mcp/server';
 
 const LETTA_PORT = 8283;
 
@@ -104,7 +104,9 @@ export async function checkLettaHealth(): Promise<boolean> {
       vscode.window.setStatusBarMessage('Letta: Connected', 5000);
       
       // Write MCP config with current port setting
-      const mcpPort = config.get<number>('mcpPort') || 7428;
+      // Get the actual running port from the MCP server if available
+      const currentServerPort = getCurrentMcpPort(); 
+      const mcpPort = currentServerPort || config.get<number>('mcpPort') || 7428;
       writeMcpConfig(mcpPort);
     } else {
       vscode.window.setStatusBarMessage('Letta: Connection failed', 5000);

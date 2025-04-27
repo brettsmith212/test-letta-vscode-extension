@@ -18,7 +18,7 @@
   - **Step Dependencies**: none  
   - **User Instructions**: After running this step, delete your old `~/.letta/mcp_config.json` and let the extension re-create it.
 
-- [ ] **Step 2: Add real `/health` endpoint check**  
+- [x] **Step 2: Add real `/health` endpoint check**  
   - **Task**: Point Docker helper to `GET /health` (fallback to `/` if 404).  
   - **Description**: Speeds up startup and avoids false positives.  
   - **Files (3)**  
@@ -33,7 +33,7 @@
   - **User Instructions**: none.
 
 ## MCP Server Robustness
-- [ ] **Step 3: Port-in-use retry & friendly error**  
+- [x] **Step 3: Port-in-use retry & friendly error**  
   - **Task**: Modify `src/mcp/server.ts` so that if 7428 is busy it shows a toast and offers “Change MCP Port”.  
   - **Description**: Prevents silent failures when multiple VS Code windows run the extension.  
   - **Files (4)**  

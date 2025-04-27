@@ -1,14 +1,17 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
+import * as net from 'net';
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import * as vscode from 'vscode';
 import { toolRegistry } from './toolRegistry';
-import { writeMcpConfig } from './config';
+import { writeMcpConfig, MCP_PORT } from './config';
+import { updateMcpPortSetting } from './settings';
 
-const DEFAULT_PORT = 7428; // MCP server port that Docker container expects
+// Use the MCP_PORT from config.ts as the default
+const DEFAULT_PORT = MCP_PORT;
 
 class McpExpressServer {
   /**
@@ -169,62 +172,91 @@ class McpExpressServer {
     });
   }
 
-  public start(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const tryPort = (port: number, maxRetries = 3, retryCount = 0) => {
+  public async start(): Promise<void> {
+    try {
+      // First, get the port from settings (might be user-configured)
+      const config = vscode.workspace.getConfiguration('lettaChat');
+      const configuredPort = config.get<number>('mcpPort') || DEFAULT_PORT;
+      console.log(`Using configured MCP port: ${configuredPort}`);
+
+      // Find an available port, starting with the configured one
+      let finalPort: number;
+      try {
+        finalPort = await findOpenPort(configuredPort, 10);
+        console.log(`Found available port: ${finalPort}`);
+      } catch (portError) {
+        // Failed to find an open port within range
+        console.error('Failed to find an open port:', portError);
+        
+        // Show a friendly error message with options
+        const selection = await vscode.window.showErrorMessage(
+          `Cannot start MCP server: all ports in range ${configuredPort}-${configuredPort + 10} are in use.`,
+          'Change MCP Port',
+          'Details'
+        );
+        
+        if (selection === 'Change MCP Port') {
+          // Let's try a completely different port range
+          const alternativePort = configuredPort + 1000; // Try a port well outside the range
+          vscode.window.showInformationMessage(`Trying alternative port ${alternativePort}...`);
+          finalPort = await findOpenPort(alternativePort, 5);
+          
+          // Update the settings with this new port for future use
+          await updateMcpPortSetting(finalPort);
+          vscode.window.showInformationMessage(`MCP port set to ${finalPort} in settings.`);
+        } else if (selection === 'Details') {
+          await vscode.commands.executeCommand('letta-ai.showErrorDetails');
+          throw portError; // Re-throw to exit the start process
+        } else {
+          // User closed the dialog or clicked Escape
+          throw portError; // Re-throw to exit the start process
+        }
+      }
+      
+      // If we got here, we have a valid port to use
+      // Start the server on that port
+      return new Promise((resolve, reject) => {
         try {
           // Log server start attempt with binding to all interfaces (0.0.0.0) for Docker access
-          console.log(`Attempting to start MCP server on port ${port} (binding to all interfaces)...`);
+          console.log(`Attempting to start MCP server on port ${finalPort} (binding to all interfaces)...`);
+          
           // Bind to all network interfaces (0.0.0.0) so Docker can connect
-          this.server = this.app.listen(port, '0.0.0.0', () => {
-            this.port = port;
-            console.log(`MCP server started successfully on port ${port}`);
+          this.server = this.app.listen(finalPort, '0.0.0.0', () => {
+            this.port = finalPort;
+            console.log(`MCP server started successfully on port ${finalPort}`);
+            
+            // Update the stored port in settings if it's different than configured
+            if (finalPort !== configuredPort) {
+              updateMcpPortSetting(finalPort);
+            }
+            
             // Write config with the actual port we're using
-            writeMcpConfig(port);
+            writeMcpConfig(finalPort);
+            
+            // Show a status message if we're using a non-default port
+            if (finalPort !== DEFAULT_PORT) {
+              vscode.window.showInformationMessage(
+                `MCP server started on alternative port ${finalPort}. Docker will connect to this port.`
+              );
+            }
+            
             resolve();
           });
 
           // Add error handler to the server
           this.server.on('error', (err) => {
-            // Most common error is port already in use (EADDRINUSE)
-            if ((err as any).code === 'EADDRINUSE') {
-              console.warn(`Port ${port} is already in use. ${retryCount < maxRetries ? 'Trying another port...' : 'Too many retries.'}`);
-              
-              // Close current failed server attempt
-              if (this.server) {
-                this.server.close();
-                this.server = null;
-              }
-              
-              // Try another port if we haven't exceeded max retries
-              // Since Docker is expecting us to use exactly port 7428, we can't retry with another port
-              // Instead, show a specific message about port 7428 being required
-              vscode.window.showErrorMessage(
-                `Cannot start MCP server on required port 7428. This port is already in use. Please check if another instance of the extension is running or restart VS Code.`,
-                'Close Docker',
-                'Details'
-              ).then(selection => {
-                if (selection === 'Close Docker') {
-                  vscode.window.showInformationMessage('Please manually close the Letta Docker container and then try again.');
-                } else if (selection === 'Details') {
-                  vscode.commands.executeCommand('letta-ai.showErrorDetails');
-                }
-              });
-              reject(err);
-            } else {
-              console.error(`Failed to start MCP server: ${err.message}`);
-              reject(err);
-            }
+            console.error(`Failed to start MCP server on port ${finalPort}:`, err);
+            reject(err);
           });
         } catch (error) {
           console.error('Unexpected error starting MCP server:', error);
           reject(error);
         }
-      };
-      
-      // Start with the default port
-      tryPort(DEFAULT_PORT);
-    });
+      });
+    } catch (outerError) {
+      console.error('MCP server startup failed:', outerError);
+      throw outerError;
+    }
   }
 
   public stop(): Promise<void> {
@@ -310,6 +342,53 @@ class McpExpressServer {
     this.disposables.push(disposable);
     return disposable;
   }
+}
+
+/**
+ * Finds an open port starting from the specified port
+ * Will increment and try up to maxRetries times
+ */
+export async function findOpenPort(port: number, maxRetries: number = 10): Promise<number> {
+  return new Promise((resolve, reject) => {
+    let currentPort = port;
+    let retries = 0;
+    const maxAttempts = maxRetries + 1; // +1 for the initial attempt
+    
+    function tryPort(portToTry: number) {
+      const server = net.createServer();
+      
+      server.once('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          console.log(`Port ${portToTry} is in use, trying next port...`);
+          if (retries < maxRetries) {
+            retries++;
+            tryPort(portToTry + 1);
+          } else {
+            server.close();
+            reject(new Error(`Could not find an open port after ${maxAttempts} attempts starting from ${port}`));
+          }
+        } else {
+          server.close();
+          reject(err);
+        }
+      });
+
+      server.once('listening', () => {
+        // Found an open port, clean up and return it
+        const foundPort = (server.address() as net.AddressInfo).port;
+        server.close(() => {
+          console.log(`Found open port: ${foundPort}`);
+          resolve(foundPort);
+        });
+      });
+
+      // Try to bind to the port on localhost
+      server.listen(portToTry, '127.0.0.1');
+    }
+
+    // Start trying with the initial port
+    tryPort(currentPort);
+  });
 }
 
 // Export a singleton instance
