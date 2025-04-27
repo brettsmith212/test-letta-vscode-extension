@@ -96,7 +96,7 @@
   - **Step Dependencies**: Step 7.
 
 ## UI Enhancements
-- [ ] **Step 9: Connection status indicator in webview**  
+- [x] **Step 9: Connection status indicator in webview**  
   - **Task**: Expose `checkLettaHealth` result via `vscode.window.onDidChangeStatusBarMessage` and display in React webview (green / red dot).  
   - **Description**: Gives users real-time feedback.  
   - **Files (5)**  

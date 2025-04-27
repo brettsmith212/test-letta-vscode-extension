@@ -103,6 +103,9 @@ export async function checkLettaHealth(): Promise<boolean> {
       // If healthy, show a status message
       vscode.window.setStatusBarMessage('Letta: Connected', 5000);
       
+      // Post status to any active chat panels
+      notifyWebviewOfStatus('connected');
+      
       // Write MCP config with current port setting
       // Get the actual running port from the MCP server if available
       const currentServerPort = getCurrentMcpPort(); 
@@ -110,13 +113,38 @@ export async function checkLettaHealth(): Promise<boolean> {
       writeMcpConfig(mcpPort);
     } else {
       vscode.window.setStatusBarMessage('Letta: Connection failed', 5000);
+      notifyWebviewOfStatus('disconnected');
     }
     
     return healthy;
   } catch (error: any) {
     console.error('Letta health check failed:', error);
     vscode.window.setStatusBarMessage('Letta: Connection error', 5000);
+    notifyWebviewOfStatus('error');
     return false;
+  }
+}
+
+/**
+ * Notifies any active webviews of the current Letta connection status
+ * @param status The connection status ('connected', 'disconnected', or 'error')
+ */
+function notifyWebviewOfStatus(status: 'connected' | 'disconnected' | 'error'): void {
+  try {
+    // Try to get the current chat panel instance if it exists
+    const { ChatPanel } = require('../panels/ChatPanel');
+    const panel = ChatPanel.getInstance(vscode.Uri.parse('file://'), undefined);
+    
+    if (panel && panel._panel && panel._panel.webview) {
+      // Send the status to the webview
+      panel._panel.webview.postMessage({
+        command: 'lettaStatus',
+        status
+      });
+    }
+  } catch (error) {
+    console.log('Could not notify webview of status change:', error);
+    // Non-critical error, so we don't need to handle it further
   }
 }
 

@@ -30,6 +30,7 @@ const ChatInner: React.FC = () => {
     });
     const [messageInProgress, setMessageInProgress] = useState<Message | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error' | 'unknown'>('unknown');
     const [errorMessages, setErrorMessages] = useState<string[]>(() => {
         const savedState = vscode.getState() as WebviewState | undefined;
         return savedState?.errorMessages || [];
@@ -45,6 +46,9 @@ const ChatInner: React.FC = () => {
         const handleMessage = (event: MessageEvent) => {
             const message = event.data;
             switch (message.command) {
+                case 'lettaStatus':
+                    setConnectionStatus(message.status);
+                    break;
                 case 'addUserMessage':
                     setMessages(prev => {
                         if (message.messageId && prev.some(msg => msg.messageId === message.messageId)) {
@@ -146,7 +150,10 @@ const ChatInner: React.FC = () => {
 
     return (
         <div className="flex flex-col h-screen bg-background">
-            <Header onNewThread={startNewThread} />
+            <Header 
+                onNewThread={startNewThread} 
+                connectionStatus={connectionStatus} 
+            />
             <ChatContainer
                 messages={messages}
                 messageInProgress={messageInProgress}
