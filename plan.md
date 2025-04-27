@@ -44,7 +44,7 @@
   - **Step Dependencies**: Step 1.  
   - **User Instructions**: Accept VS Code prompt if asked to reopen Docker port in firewall.
 
-- [ ] **Step 4: Graceful shutdown on VS Code deactivate & window reload**  
+- [x] **Step 4: Graceful shutdown on VS Code deactivate & window reload**  
   - **Task**: Ensure `mcpServer.stop()` is called on extension reloads to free the port.  
   - **Description**: Avoids “port already in use” when reloading window.  
   - **Files (2)**  

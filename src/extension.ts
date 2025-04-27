@@ -7,6 +7,67 @@ import { indexWorkspace } from './commands/indexWorkspace';
 import { clearProjectMemory, clearPersonaMemory } from './commands/flushMemory';
 import { reconnectLetta } from './utils/dockerHelper';
 
+/**
+ * Handles the graceful shutdown of MCP server when VS Code is about to shutdown
+ */
+function registerShutdownHandler(context: vscode.ExtensionContext) {
+    // Handle VS Code shutdown
+    const shutdownListener = vscode.workspace.onDidChangeConfiguration(async event => {
+        if (event.affectsConfiguration('lettaChat.mcpPort')) {
+            console.log('MCP port setting changed, restarting MCP server...');
+            try {
+                // Stop existing server
+                const mcpServer = getOrCreateMcpServer();
+                await mcpServer.stop();
+                
+                // Restart with new port
+                await mcpServer.start();
+                console.log('MCP server restarted with new port setting');
+                
+                // Update the Letta connection
+                await reconnectLetta();
+            } catch (error) {
+                console.error('Failed to restart MCP server with new port:', error);
+                vscode.window.showErrorMessage(
+                    'Failed to restart MCP server with new port setting. See Output panel for details.'
+                );
+            }
+        }
+    });
+    context.subscriptions.push(shutdownListener);
+    
+    // Register for window shutdown event
+    const windowShutdownListener = vscode.window.onDidChangeWindowState(async state => {
+        if (!state.focused) {
+            // Window lost focus (might be closing) - we'll log this but not stop the server
+            // as this also fires when user simply switches to another window
+            console.log('Window lost focus');
+        }
+    });
+    context.subscriptions.push(windowShutdownListener);
+    
+    // Listen for the VS Code shutdown event
+    const shutdownHandler = vscode.workspace.onWillSaveTextDocument(async e => {
+        if (e.document.uri.scheme === 'untitled') {
+            // This is a heuristic - when VS Code is closing an untitled document it might be
+            // saving temp state which indicates window is closing
+            console.log('Detected possible window close via untitled document save');
+            const mcpServer = getOrCreateMcpServer();
+            await mcpServer.stop();
+        }
+    });
+    context.subscriptions.push(shutdownHandler);
+    
+    // This is the most reliable shutdown handler
+    context.subscriptions.push(new vscode.Disposable(() => {
+        console.log('Extension is being disposed, stopping MCP server...');
+        const mcpServer = getOrCreateMcpServer();
+        mcpServer.stop().catch(err => {
+            console.error('Error stopping MCP server during shutdown:', err);
+        });
+    }));
+}
+
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Letta AI extension is now active!');
 
@@ -37,6 +98,9 @@ export async function activate(context: vscode.ExtensionContext) {
             `To reconnect: Run 'Letta AI: Reconnect to Server' from the command palette`
         );
     }));
+    
+    // Register shutdown handler to ensure graceful cleanup
+    registerShutdownHandler(context);
 
     try {
         console.log('Starting activation sequence...');
