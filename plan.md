@@ -79,7 +79,7 @@
   - **Step Dependencies**: Step 5.
 
 ## Letta Service Reliability
-- [ ] **Step 7: Refactor `attachToolsToAgent` for SDK 0.1.102**  
+- [x] **Step 7: Refactor `attachToolsToAgent` for SDK 0.1.102**  
   - **Task**: Replace deprecated `client.tools.listMcpToolsByServer` with `client.tools.listMcpTools('vscode')`.  
   - **Description**: Keeps code in sync with current SDK.  
   - **Files (2)**  
