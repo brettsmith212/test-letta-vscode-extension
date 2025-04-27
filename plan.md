@@ -69,7 +69,7 @@
   - **Step Dependencies**: Step 2.  
   - **User Instructions**: none.
 
-- [ ] **Step 6: Confirmation dialog for `delete_file` & overwrite**  
+- [x] **Step 6: Confirmation dialog for `delete_file` & overwrite**  
   - **Task**: Before delete/overwrite, show VS Code modal “Yes / No”.  
   - **Description**: Prevents accidental destructive edits.  
   - **Files (3)**  

@@ -192,6 +192,30 @@ export async function executeTool(toolName: string, input: any, showContents: bo
         }
         const uri = vscode.Uri.file(filePath);
         console.log(`executeTool: ${toolName} at ${uri.fsPath}`);
+        
+        // Check if file exists before creating it
+        try {
+          await vscode.workspace.fs.stat(uri);
+          
+          // File exists, ask for confirmation before overwriting
+          const choice = await vscode.window.showWarningMessage(
+            `File ${params.path} already exists. Do you want to overwrite it?`,
+            { modal: true },
+            'Yes',
+            'Cancel'
+          );
+          
+          if (choice !== 'Yes') {
+            console.log(`Create file operation cancelled for ${params.path}`);
+            return `Operation cancelled: File ${params.path} was not overwritten.`;
+          }
+          
+          console.log(`User confirmed overwrite of ${params.path}`);
+        } catch (error) {
+          // File doesn't exist, no confirmation needed
+          console.log(`File ${params.path} doesn't exist yet, creating new file.`);
+        }
+        
         const encoder = new TextEncoder();
         await vscode.workspace.fs.writeFile(uri, encoder.encode(params.content));
         const result = `File ${params.path} has been created or updated.`;
@@ -212,6 +236,29 @@ export async function executeTool(toolName: string, input: any, showContents: bo
         }
         const uri = vscode.Uri.file(filePath);
         console.log(`executeTool: ${toolName} at ${uri.fsPath}`);
+        
+        // Check if file exists before updating it
+        try {
+          await vscode.workspace.fs.stat(uri);
+        } catch (error) {
+          throw new Error(`File ${params.path} does not exist. Use create_file instead.`);
+        }
+        
+        // Show confirmation dialog before update
+        const choice = await vscode.window.showWarningMessage(
+          `Are you sure you want to update file ${params.path}? This will replace its entire contents.`,
+          { modal: true },
+          'Yes',
+          'Cancel'
+        );
+        
+        if (choice !== 'Yes') {
+          console.log(`Update operation cancelled for ${params.path}`);
+          return `Operation cancelled: File ${params.path} was not updated.`;
+        }
+        
+        console.log(`User confirmed update of ${params.path}`);
+        
         const encoder = new TextEncoder();
         await vscode.workspace.fs.writeFile(uri, encoder.encode(params.content));
         const result = `File ${params.path} has been updated.`;
@@ -232,6 +279,21 @@ export async function executeTool(toolName: string, input: any, showContents: bo
         }
         const deleteUri = vscode.Uri.file(deletePath);
         console.log(`executeTool: delete_file at ${deleteUri.fsPath}`);
+        
+        // Show confirmation dialog before deletion
+        const choice = await vscode.window.showWarningMessage(
+          `Are you sure you want to delete file ${params.path}?`,
+          { modal: true },
+          'Yes',
+          'Cancel'
+        );
+        
+        if (choice !== 'Yes') {
+          console.log(`Delete operation cancelled for ${params.path}`);
+          return `Operation cancelled: File ${params.path} was not deleted.`;
+        }
+        
+        console.log(`User confirmed deletion of ${params.path}`);
         await vscode.workspace.fs.delete(deleteUri);
         const deleteResult = `File ${params.path} has been deleted.`;
         console.log(`Tool delete_file executed successfully:`, deleteResult);

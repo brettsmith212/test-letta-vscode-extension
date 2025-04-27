@@ -13,12 +13,17 @@ vi.mock('vscode', () => {
       fs: {
         writeFile: vi.fn().mockResolvedValue(undefined),
         readFile: vi.fn().mockResolvedValue(new Uint8Array([116, 101, 115, 116])), // 'test' in bytes
-        delete: vi.fn().mockResolvedValue(undefined)
+        delete: vi.fn().mockResolvedValue(undefined),
+        stat: vi.fn().mockResolvedValue({ type: 1 }) // FileType.File
       },
       getConfiguration: vi.fn().mockImplementation(() => ({
         get: vi.fn().mockReturnValue({})
       })),
       findFiles: vi.fn().mockImplementation(() => Promise.resolve(mockUris))
+    },
+    window: {
+      showWarningMessage: vi.fn().mockResolvedValue('Yes'),
+      showInformationMessage: vi.fn()
     },
     Uri: { file: (path: string) => ({ fsPath: path }) }
   };
@@ -81,6 +86,14 @@ describe('file tools validation', () => {
         path: 'test.txt'
       })).rejects.toThrow();
 
+      // Mock the file existence check
+      const mockStat = vi.spyOn(vscode.workspace.fs, 'stat');
+      mockStat.mockResolvedValueOnce({ type: 1 }); // File exists
+      
+      // Mock confirmation
+      const mockWarning = vi.spyOn(vscode.window, 'showWarningMessage');
+      mockWarning.mockResolvedValueOnce('Yes');
+
       // This should pass validation
       const mockWrite = vi.spyOn(vscode.workspace.fs, 'writeFile');
       await executeTool('update_file', {
@@ -97,6 +110,10 @@ describe('file tools validation', () => {
       await expect(executeTool('delete_file', {
         // Missing required property 'path'
       })).rejects.toThrow();
+
+      // Mock confirmation
+      const mockWarning = vi.spyOn(vscode.window, 'showWarningMessage');
+      mockWarning.mockResolvedValueOnce('Yes');
 
       // This should pass validation
       const mockDelete = vi.spyOn(vscode.workspace.fs, 'delete');
